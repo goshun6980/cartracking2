@@ -113,7 +113,7 @@
                 </button>
             </div>
 
-            <!-- Sync Status Indicator (Strict status without fake animations) -->
+            <!-- Sync Status Indicator -->
             <div id="syncBadge" class="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 font-bold border border-slate-300 dark:border-slate-700">
                 <span id="syncDot" class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
                 <span id="syncText">デモ</span>
@@ -462,7 +462,7 @@
             theme: localStorage.getItem('fleet_theme') || 'system',
             gasUrl: localStorage.getItem('fleet_gas_url') || '',
             
-            // Clean initial state (No dummy ghost vehicles)
+            // Vehicles state
             vehicles: JSON.parse(localStorage.getItem('fleet_vehicles') || '{}'),
 
             // History Telemetry Logs
@@ -500,12 +500,11 @@
             initTheme();
             initLeafletMap();
             initOsmTimer();
-            fetchVehiclesFromGAS(); // Fast fetch via GAS
+            fetchVehiclesFromGAS();
             startFastPolling();
             updateDisplayDateLabel();
         };
 
-        // Parse GAS URL embedded in URL query parameters
         function parseUrlParameters() {
             const params = new URLSearchParams(window.location.search);
             if (params.has('gasUrl')) {
@@ -736,14 +735,18 @@
                 state.vehicles[vId].online = true;
                 state.vehicles[vId].lastUpdated = now.toISOString();
 
-                state.historyLogs.push({
+                const logItem = {
                     id: vId,
                     lat: latitude,
                     lng: longitude,
                     speed: calcSpeed,
-                    heading: calcHeading,
                     time: now.toISOString()
-                });
+                };
+
+                state.historyLogs.push(logItem);
+                
+                // Add to GAS history sheet
+                addHistoryLogToGAS(logItem);
             }
 
             document.getElementById('liveSpeed').innerText = calcSpeed.toFixed(1);
@@ -893,7 +896,7 @@
 
             let csvContent = "\uFEFFid,time,speed,latitude,longitude\n";
             logs.forEach(l => {
-                csvContent += `${l.id},${l.time},${l.speed.toFixed(2)},${l.lat},${l.lng}\n`;
+                csvContent += `${l.id},${l.time},${Number(l.speed).toFixed(2)},${l.lat},${l.lng}\n`;
             });
 
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1051,6 +1054,23 @@
             }
         }
 
+        // Append log item to GAS history sheet (POST)
+        async function addHistoryLogToGAS(logItem) {
+            if (!state.gasUrl) return;
+            try {
+                await fetch(state.gasUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({
+                        action: 'addHistory',
+                        log: logItem
+                    })
+                });
+            } catch (err) {
+                console.error("History Log Error:", err);
+            }
+        }
+
         function handleSyncOfflineState() {
             if (!state.isCurrentlyOffline) {
                 state.isCurrentlyOffline = true;
@@ -1112,6 +1132,7 @@
             } else {
                 vehiclesArr.forEach(v => {
                     const colorHex = v.color || '#6366f1';
+                    const speedNum = Number(v.speed) || 0;
                     const item = document.createElement('div');
                     item.className = "p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 hover:border-brand-500 cursor-pointer transition-all";
                     item.onclick = () => focusOnVehicle(v.id);
@@ -1126,7 +1147,7 @@
                             </span>
                         </div>
                         <div class="text-[11px] text-slate-500 dark:text-slate-400 flex justify-between font-mono">
-                            <span>速度: ${v.speed.toFixed(1)} km/h</span>
+                            <span>速度: ${speedNum.toFixed(1)} km/h</span>
                             <span>${formatTimeAgo(v.lastUpdated)}</span>
                         </div>
                     `;
@@ -1263,7 +1284,6 @@
             }
         }
 
-        // Config Modal & Shareable URL
         function openConfigModal() {
             document.getElementById('cfgGasUrl').value = state.gasUrl || '';
             updateShareUrl();
@@ -1321,7 +1341,6 @@
             return `${Math.floor(diffSec / 60)}分前`;
         }
 
-        // GPS Math Helpers
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371e3;
             const φ1 = lat1 * Math.PI / 180;
