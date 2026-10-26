@@ -1,989 +1,1135 @@
 <!DOCTYPE html>
 <html lang="ja" class="h-full">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>リアルタイム車両動態管理システム (Fleet Tracking System)</title>
-  
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            google: {
-              blue: '#1a73e8',
-              blueHover: '#1557b0',
-              red: '#ea4335',
-              yellow: '#fbbc04',
-              green: '#34a853',
-              darkBg: '#121212',
-              darkSurface: '#1e1e1e',
-              darkCard: '#2d2d2d',
-              darkBorder: '#3c4043'
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>車両運行・位置情報管理システム (Fleet Tracker)</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"BIZ UDGothic"', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
             }
-          },
-          fontFamily: {
-            sans: ['"BIZ UDGothic"', 'Roboto', 'Arial', 'sans-serif']
-          }
         }
-      }
-    };
-  </script>
+    </script>
 
-  <!-- Google Fonts: BIZ UDGothic & Material Symbols Outlined -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <!-- BIZ UD Gothic Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic:wght@400;700&display=swap" rel="stylesheet">
 
-  <!-- Leaflet CSS & JS for Maps -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Material Symbols Outlined Icons -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 
-  <style>
-    /* Custom CSS for Material Icons vertical alignment & map responsiveness */
-    .material-symbols-outlined {
-      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-      vertical-align: middle;
-      display: inline-block;
-    }
-    .material-symbols-outlined.fill {
-      font-variation-settings: 'FILL' 1;
-    }
-    /* Hide scrollbars for clean UI */
-    .no-scrollbar::-webkit-scrollbar {
-      display: none;
-    }
-    .no-scrollbar {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
-    /* SVG Marker Rotation Utility */
-    .vehicle-marker-icon {
-      transition: transform 0.3s ease-out;
-    }
-  </style>
+    <!-- Leaflet JS & CSS for OpenStreetMap (OSM) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <style>
+        body {
+            font-family: 'BIZ UDGothic', system-ui, -apple-system, sans-serif;
+            touch-action: manipulation;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        /* Custom map tile adjustments for dark mode */
+        .dark .leaflet-tile-pane {
+            filter: brightness(0.7) invert(1) contrast(1.2) hue-rotate(200deg);
+        }
+        .dark .leaflet-control-zoom a, .dark .leaflet-control-attribution {
+            background-color: #1f2937 !important;
+            color: #f3f4f6 !important;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 3px;
+        }
+    </style>
 </head>
-<body class="h-full bg-gray-50 text-gray-800 dark:bg-google-darkBg dark:text-gray-100 font-sans transition-colors duration-200 flex flex-col overflow-hidden select-none">
+<body class="h-full bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 flex flex-col transition-colors duration-200 selection:bg-brand-500 selection:text-white">
 
-  <!-- TOP HEADER / NAV BAR -->
-  <header class="h-14 bg-white dark:bg-google-darkSurface border-b border-gray-200 dark:border-google-darkBorder px-4 flex items-center justify-between z-30 flex-shrink-0 shadow-sm">
-    <div class="flex items-center gap-3">
-      <span class="material-symbols-outlined text-google-blue text-2xl">local_shipping</span>
-      <h1 class="font-bold text-lg tracking-tight flex items-center gap-2">
-        Fleet Tracker <span class="text-xs font-normal px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950 text-google-blue border border-blue-200 dark:border-blue-800">Pro</span>
-      </h1>
-    </div>
-
-    <!-- Mode Selector & Settings -->
-    <div class="flex items-center gap-2">
-      <!-- Device Mode Indicator (Auto-detected) -->
-      <span id="viewModeBadge" class="hidden md:inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-        <span class="material-symbols-outlined text-sm">desktop_windows</span> デスクトップビュー
-      </span>
-
-      <!-- Theme Toggle -->
-      <button id="themeToggleBtn" title="ダーク/ライトモード切り替え text-sm" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-google-darkCard text-gray-600 dark:text-gray-300 transition-colors">
-        <span class="material-symbols-outlined" id="themeIcon">dark_mode</span>
-      </button>
-
-      <!-- GitHub Sync Settings Modal Trigger -->
-      <button id="openSettingsBtn" title="GitHub 連携設定" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-google-darkCard text-gray-600 dark:text-gray-300 transition-colors relative">
-        <span class="material-symbols-outlined">settings</span>
-        <span id="syncStatusDot" class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-yellow-500 rounded-full border-2 border-white dark:border-google-darkSurface" title="オフライン/ローカルストレージ動作中"></span>
-      </button>
-    </div>
-  </header>
-
-  <!-- MAIN VIEW CONTAINER -->
-  <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-
-    <!-- SIDEBAR (Admin Dashboard Controls on Desktop / Tab drawer on Mobile) -->
-    <aside id="sidebar" class="w-full md:w-80 lg:w-96 bg-white dark:bg-google-darkSurface border-r border-gray-200 dark:border-google-darkBorder flex flex-col flex-shrink-0 z-20 transition-all duration-300 overflow-hidden">
-      
-      <!-- NAVIGATION TABS (Mobile View Controls / Mode Switcher) -->
-      <div class="flex border-b border-gray-200 dark:border-google-darkBorder bg-gray-50 dark:bg-google-darkCard">
-        <button id="tabDriverBtn" class="flex-1 py-3 text-sm font-bold text-google-blue border-b-2 border-google-blue flex items-center justify-center gap-1.5 transition-colors">
-          <span class="material-symbols-outlined text-lg">smartphone</span> 送信 (ドライバー)
-        </button>
-        <button id="tabAdminBtn" class="flex-1 py-3 text-sm font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 border-b-2 border-transparent flex items-center justify-center gap-1.5 transition-colors">
-          <span class="material-symbols-outlined text-lg">admin_panel_settings</span> 管理 (管理画面)
-        </button>
-      </div>
-
-      <!-- TAB CONTENT CONTAINER -->
-      <div class="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
-
-        <!-- ================= DRIVER PANEL (MOBILE NODE) ================= -->
-        <div id="driverPanel" class="space-y-4">
-          <div class="bg-gray-50 dark:bg-google-darkCard p-4 rounded-xl border border-gray-200 dark:border-google-darkBorder space-y-3">
-            <h2 class="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-google-blue">directions_car</span> 車両端末設定
-            </h2>
-
+    <!-- Top Header Bar -->
+    <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between shrink-0 shadow-sm z-30">
+        <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-brand-600 dark:text-brand-500 text-2xl md:text-3xl">directions_car</span>
             <div>
-              <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">自車（デバイス）を選択</label>
-              <select id="vehicleSelect" class="w-full bg-white dark:bg-google-darkSurface border border-gray-300 dark:border-google-darkBorder rounded-lg p-2.5 text-sm font-bold focus:ring-2 focus:ring-google-blue outline-none transition">
-                <option value="CAR-001">車両A [愛知 500 さ 12-34]</option>
-                <option value="CAR-002">車両B [名古屋 300 も 56-78]</option>
-                <option value="CAR-003">車両C [三河 400 た 90-12]</option>
-                <option value="CAR-004">配送トラック 1号 [岡崎 100 か 33-44]</option>
-              </select>
+                <h1 class="text-base md:text-lg font-bold leading-tight">車両運行管理システム</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">OpenStreetMap & GitHub API リアルタイム連携</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 md:gap-3">
+            <!-- Mode Switcher Tabs (Desktop Only) -->
+            <div id="desktopNav" class="hidden md:flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl gap-1 text-sm font-bold">
+                <button onclick="switchView('map')" id="tab-map" class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors bg-white dark:bg-slate-800 text-brand-600 dark:text-brand-500 shadow-sm">
+                    <span class="material-symbols-outlined text-lg">map</span> モニター / 地図
+                </button>
+                <button onclick="switchView('driver')" id="tab-driver" class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors text-slate-600 dark:text-slate-300 hover:text-slate-900">
+                    <span class="material-symbols-outlined text-lg">navigation</span> ドライバー送信
+                </button>
+                <button onclick="switchView('admin')" id="tab-admin" class="px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors text-slate-600 dark:text-slate-300 hover:text-slate-900">
+                    <span class="material-symbols-outlined text-lg">admin_panel_settings</span> 管理画面
+                </button>
             </div>
 
-            <!-- GPS Consent & Toggle -->
-            <div class="pt-2">
-              <label class="flex items-start gap-2.5 cursor-pointer text-xs text-gray-600 dark:text-gray-300 leading-tight">
-                <input type="checkbox" id="consentCheckbox" class="mt-0.5 rounded text-google-blue focus:ring-google-blue border-gray-300 dark:border-gray-600">
-                <span>位置情報の定期的なリアルタイム送信、およびデータのGitHub/クラウド保存に同意します。</span>
-              </label>
+            <!-- Sync Indicator -->
+            <div id="syncBadge" class="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 font-bold">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="syncText">デモ/同期中</span>
             </div>
 
-            <button id="startGpsBtn" disabled class="w-full py-3 px-4 bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-lg font-bold flex items-center justify-center gap-2 shadow transition-all cursor-not-allowed">
-              <span class="material-symbols-outlined">location_searching</span> 位置情報送信を開始
+            <!-- Config Gear Icon -->
+            <button onclick="openConfigModal()" class="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="GitHub連携設定">
+                <span class="material-symbols-outlined">settings</span>
             </button>
 
-            <!-- Mock Driving Simulator Toggle -->
-            <div class="pt-2 border-t border-gray-200 dark:border-google-darkBorder">
-              <button id="toggleSimDriveBtn" class="w-full py-2 px-3 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-indigo-100 transition">
-                <span class="material-symbols-outlined text-base">route</span> 【デモ用】走行シミュレータ起動
-              </button>
-            </div>
-          </div>
-
-          <!-- Realtime Driver Dashboard Card -->
-          <div class="bg-white dark:bg-google-darkCard p-4 rounded-xl border border-gray-200 dark:border-google-darkBorder shadow-sm space-y-3">
-            <h3 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">リアルタイムステータス</h3>
-            <div class="grid grid-cols-2 gap-3">
-              <div class="bg-gray-50 dark:bg-google-darkSurface p-3 rounded-lg border border-gray-100 dark:border-google-darkBorder">
-                <span class="text-xs text-gray-400 block">現在速度</span>
-                <span id="currentSpeedDisplay" class="text-2xl font-bold text-google-blue">0.0 <span class="text-xs font-normal text-gray-500">km/h</span></span>
-              </div>
-              <div class="bg-gray-50 dark:bg-google-darkSurface p-3 rounded-lg border border-gray-100 dark:border-google-darkBorder">
-                <span class="text-xs text-gray-400 block">進行方向</span>
-                <span id="currentHeadingDisplay" class="text-lg font-bold text-gray-700 dark:text-gray-200 flex items-center gap-1">
-                  <span id="headingArrow" class="material-symbols-outlined transition-transform">navigation</span>
-                  <span id="headingText">--</span>
-                </span>
-              </div>
-            </div>
-
-            <div class="text-xs space-y-1 text-gray-500 dark:text-gray-400 pt-1">
-              <div class="flex justify-between">
-                <span>緯度/経度:</span>
-                <span id="latLngDisplay" class="font-mono text-gray-700 dark:text-gray-300">35.1815, 136.9064</span>
-              </div>
-              <div class="flex justify-between">
-                <span>最終更新:</span>
-                <span id="lastUpdatedDisplay" class="font-mono">未送信</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ================= ADMIN PANEL (FLEET CONTROL) ================= -->
-        <div id="adminPanel" class="space-y-4 hidden">
-
-          <!-- Live Fleet Summary List -->
-          <div class="bg-gray-50 dark:bg-google-darkCard p-3 rounded-xl border border-gray-200 dark:border-google-darkBorder">
-            <div class="flex items-center justify-between mb-2">
-              <h2 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">車両稼働一覧</h2>
-              <span id="onlineCountBadge" class="text-xs font-bold bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300 px-2 py-0.5 rounded-full">0 台稼働中</span>
-            </div>
-            <div id="vehicleListContainer" class="space-y-2 max-h-48 overflow-y-auto pr-1 no-scrollbar">
-              <!-- Vehicle item template populated dynamically -->
-            </div>
-          </div>
-
-          <!-- Data Operations & Purge -->
-          <div class="bg-white dark:bg-google-darkCard p-4 rounded-xl border border-gray-200 dark:border-google-darkBorder space-y-2">
-            <h3 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">データ管理・出力</h3>
-            <div class="grid grid-cols-2 gap-2">
-              <button id="exportCsvBtn" class="py-2 px-3 bg-gray-100 hover:bg-gray-200 dark:bg-google-darkSurface dark:hover:bg-google-darkBorder text-gray-700 dark:text-gray-200 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition">
-                <span class="material-symbols-outlined text-sm">download</span> CSV エクスポート
-              </button>
-              <button id="exportJsonBtn" class="py-2 px-3 bg-gray-100 hover:bg-gray-200 dark:bg-google-darkSurface dark:hover:bg-google-darkBorder text-gray-700 dark:text-gray-200 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition">
-                <span class="material-symbols-outlined text-sm">code</span> JSON エクスポート
-              </button>
-            </div>
-            <button id="clearHistoryBtn" class="w-full py-2 px-3 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/60 text-google-red rounded-lg text-xs font-bold flex items-center justify-center gap-1 border border-red-200 dark:border-red-900 transition">
-              <span class="material-symbols-outlined text-sm">delete_forever</span> 履歴ログの一括削除
+            <!-- Light/Dark Mode Toggle -->
+            <button onclick="toggleDarkMode()" class="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="テーマ切り替え">
+                <span id="themeIcon" class="material-symbols-outlined">dark_mode</span>
             </button>
-          </div>
         </div>
+    </header>
 
-      </div>
-    </aside>
+    <!-- Main View Container -->
+    <main class="flex-1 relative overflow-hidden flex flex-col md:flex-row">
 
-    <!-- MAP CONTAINER -->
-    <main class="flex-1 h-full relative flex flex-col">
-      <div id="map" class="w-full h-full z-0 bg-gray-200 dark:bg-gray-900"></div>
+        <!-- 1. MAP VIEW (Monitoring Dashboard) -->
+        <section id="view-map" class="w-full h-full flex flex-col md:flex-row flex-1 relative">
+            
+            <!-- Map Container -->
+            <div class="flex-1 relative h-full w-full">
+                <div id="leafletMap" class="w-full h-full z-0"></div>
 
-      <!-- HISTORICAL PLAYBACK CONTROLLER (YouTube / Weather Radar Style Bottom Bar) -->
-      <div id="playbackBar" class="absolute bottom-4 left-4 right-4 md:left-6 md:right-6 bg-white/95 dark:bg-google-darkSurface/95 backdrop-blur border border-gray-200 dark:border-google-darkBorder rounded-2xl p-3 shadow-xl z-10 flex flex-col gap-2 transition-all">
-        
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-google-blue">history</span>
-            <span class="text-xs font-bold text-gray-700 dark:text-gray-200">履歴プレイバック (雨雲レーダー風再生)</span>
-            <span id="playbackModeBadge" class="text-[10px] px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300">ライブ表示中</span>
-          </div>
+                <!-- OSM Info Banner Overlay -->
+                <div id="osmInfoBanner" class="absolute top-3 left-3 right-3 md:left-3 md:right-auto md:max-w-md bg-white/95 dark:bg-slate-800/95 backdrop-blur-md p-3.5 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 z-10 text-xs">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex gap-2">
+                            <span class="material-symbols-outlined text-amber-500 text-xl shrink-0">info</span>
+                            <div>
+                                <strong class="text-slate-900 dark:text-white font-bold block mb-0.5">OpenStreetMap (OSM) 使用ガイド</strong>
+                                <p class="text-slate-600 dark:text-slate-300 leading-relaxed">
+                                    本システムは完全無料で利用可能な **OpenStreetMap** タイルサーバーをLeaflet.js経由で標準使用しています。APIキー不要で即時利用できます。
+                                </p>
+                            </div>
+                        </div>
+                        <button onclick="document.getElementById('osmInfoBanner').remove()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                            <span class="material-symbols-outlined text-base">close</span>
+                        </button>
+                    </div>
+                </div>
 
-          <div class="flex items-center gap-2 text-xs font-mono text-gray-600 dark:text-gray-400">
-            <span id="playbackTimeDisplay">--:--:--</span>
-          </div>
-        </div>
+                <!-- Timeline Scrubber Bar (YouTube/Weather Radar Style) -->
+                <div class="absolute bottom-4 left-4 right-4 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md p-3 md:p-4 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 z-10">
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <div class="flex items-center gap-2">
+                            <button id="playbackPlayBtn" onclick="togglePlayback()" class="w-9 h-9 rounded-full bg-brand-600 text-white flex items-center justify-center hover:bg-brand-700 shadow-md transition-transform active:scale-95">
+                                <span class="material-symbols-outlined text-xl">play_arrow</span>
+                            </button>
+                            <span class="text-xs font-bold text-slate-700 dark:text-slate-200" id="playbackTimeLabel">リアルタイム表示中</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs">
+                            <button onclick="setPlaybackSpeed(1)" class="px-2 py-1 rounded bg-slate-200 dark:bg-slate-700 font-bold hover:bg-brand-500 hover:text-white transition-colors" id="spd-1">1x</button>
+                            <button onclick="setPlaybackSpeed(4)" class="px-2 py-1 rounded bg-slate-200 dark:bg-slate-700 font-bold hover:bg-brand-500 hover:text-white transition-colors" id="spd-4">4x</button>
+                            <button onclick="resetToRealtime()" class="px-2.5 py-1 rounded bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300 font-bold">リアルタイムに戻る</button>
+                        </div>
+                    </div>
+                    <input type="range" id="timelineSlider" min="0" max="100" value="100" oninput="onSliderChange(this.value)" class="w-full accent-brand-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg cursor-pointer">
+                </div>
+            </div>
 
-        <!-- Slider Bar -->
-        <div class="flex items-center gap-3">
-          <input type="range" id="historyTimeline" min="0" max="100" value="100" class="w-full h-2 bg-gray-200 dark:bg-google-darkBorder rounded-lg appearance-none cursor-pointer accent-google-blue">
-        </div>
+            <!-- Vehicles Side Drawer (Desktop Right Side / Collapsible) -->
+            <div class="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col h-48 md:h-full z-10 shadow-lg">
+                <div class="p-3 border-b border-slate-200 dark:border-slate-700 font-bold text-sm flex items-center justify-between">
+                    <span class="flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-brand-600">directions_car</span>
+                        稼働中車両リスト
+                    </span>
+                    <span id="vehicleCountBadge" class="bg-brand-100 dark:bg-brand-900/50 text-brand-700 dark:text-brand-300 text-xs px-2 py-0.5 rounded-full font-bold">0台</span>
+                </div>
+                <div id="vehicleList" class="flex-1 overflow-y-auto p-2 space-y-2">
+                    <!-- Dynamic Vehicle Items -->
+                </div>
+            </div>
+        </section>
 
-        <!-- Controls Row -->
-        <div class="flex items-center justify-between pt-1">
-          <div class="flex items-center gap-1">
-            <button id="playPauseBtn" class="p-2 rounded-full bg-google-blue text-white hover:bg-google-blueHover transition shadow">
-              <span class="material-symbols-outlined text-xl" id="playPauseIcon">play_arrow</span>
-            </button>
-            <button id="liveReturnBtn" class="ml-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-google-darkCard dark:hover:bg-google-darkBorder text-xs font-bold rounded-full text-gray-700 dark:text-gray-200 transition flex items-center gap-1">
-              <span class="material-symbols-outlined text-sm text-google-red">sensors</span> リアルタイムに戻る
-            </button>
-          </div>
+        <!-- 2. DRIVER TRANSMITTER VIEW -->
+        <section id="view-driver" class="hidden w-full h-full overflow-y-auto p-4 md:p-8 max-w-xl mx-auto flex flex-col justify-start gap-4">
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-5 md:p-6 shadow-xl border border-slate-200 dark:border-slate-700">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="p-3 bg-brand-100 dark:bg-brand-900/50 text-brand-600 dark:text-brand-400 rounded-2xl">
+                        <span class="material-symbols-outlined text-3xl">navigation</span>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold">車載端末 位置情報送信</h2>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">現在位置・速度・方角をリアルタイム送信します</p>
+                    </div>
+                </div>
 
-          <!-- Speed Controls -->
-          <div class="flex items-center gap-1 text-xs">
-            <span class="text-gray-400 mr-1">再生速度:</span>
-            <button class="speed-btn px-2 py-1 rounded bg-gray-100 dark:bg-google-darkCard font-bold text-google-blue" data-speed="1">1x</button>
-            <button class="speed-btn px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-google-darkCard" data-speed="2">2x</button>
-            <button class="speed-btn px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-google-darkCard" data-speed="5">5x</button>
-            <button class="speed-btn px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-google-darkCard" data-speed="10">10x</button>
-          </div>
-        </div>
+                <!-- Driver Controls Form -->
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">乗車・担当車両の選択</label>
+                        <select id="driverVehicleSelect" class="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm font-bold focus:ring-2 focus:ring-brand-500">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
 
-      </div>
+                    <!-- Location Tracking Switch -->
+                    <div class="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                        <div>
+                            <span class="font-bold text-sm block">GPS位置情報の送信</span>
+                            <span id="gpsStatusText" class="text-xs text-slate-500 dark:text-slate-400">停止中</span>
+                        </div>
+                        <button id="toggleGpsBtn" onclick="toggleGpsTracking()" class="px-6 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm shadow-md transition-all active:scale-95 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-xl">play_arrow</span>
+                            送信開始
+                        </button>
+                    </div>
+
+                    <!-- Live Telemetry Card -->
+                    <div class="grid grid-cols-2 gap-3 pt-2">
+                        <div class="p-3 bg-slate-100 dark:bg-slate-700 rounded-xl text-center">
+                            <span class="text-xs text-slate-500 dark:text-slate-400 block mb-1">現在速度</span>
+                            <span id="liveSpeed" class="text-2xl font-bold text-brand-600 dark:text-brand-400">0.0</span>
+                            <span class="text-xs text-slate-500"> km/h</span>
+                        </div>
+                        <div class="p-3 bg-slate-100 dark:bg-slate-700 rounded-xl text-center">
+                            <span class="text-xs text-slate-500 dark:text-slate-400 block mb-1">移動方角</span>
+                            <span id="liveHeading" class="text-2xl font-bold text-slate-700 dark:text-slate-200">0°</span>
+                            <span id="liveHeadingCardinal" class="text-xs text-slate-500 block">北</span>
+                        </div>
+                    </div>
+
+                    <!-- Geolocation Status Details -->
+                    <div class="text-xs text-slate-500 dark:text-slate-400 space-y-1 bg-slate-50 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <p class="flex justify-between"><span>最終更新:</span> <span id="liveLastUpdate" class="font-mono">-</span></p>
+                        <p class="flex justify-between"><span>緯度/経度:</span> <span id="liveCoords" class="font-mono">-</span></p>
+                        <p class="flex justify-between"><span>GPS精度:</span> <span id="liveAccuracy" class="font-mono">-</span></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. ADMIN DASHBOARD & VEHICLE EDITING VIEW -->
+        <section id="view-admin" class="hidden w-full h-full overflow-y-auto p-4 md:p-8 max-w-5xl mx-auto space-y-6">
+
+            <!-- Admin Password Authentication Screen (If not logged in) -->
+            <div id="adminAuthCard" class="max-w-md mx-auto bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-200 dark:border-slate-700 text-center space-y-4">
+                <div class="w-16 h-16 bg-brand-100 dark:bg-brand-900/50 text-brand-600 dark:text-brand-400 rounded-full flex items-center justify-center mx-auto">
+                    <span class="material-symbols-outlined text-3xl">lock</span>
+                </div>
+                <h2 class="text-xl font-bold">管理者ログイン</h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">車両情報の変更やシステム管理を行うにはパスワードが必要です。<br>(初期パスワード: <code class="bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-brand-600 font-bold">admin</code>)</p>
+
+                <div class="space-y-3">
+                    <input type="password" id="adminPasswordInput" placeholder="パスワードを入力" class="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-center font-bold text-lg focus:ring-2 focus:ring-brand-500">
+                    <button onclick="attemptAdminLogin()" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-md transition-all active:scale-95">
+                        ログイン
+                    </button>
+                </div>
+            </div>
+
+            <!-- Admin Dashboard Main Panel (Hidden until authenticated) -->
+            <div id="adminPanel" class="hidden space-y-6">
+                <!-- Header Banner -->
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <div>
+                        <h2 class="text-xl font-bold flex items-center gap-2">
+                            <span class="material-symbols-outlined text-brand-600">admin_panel_settings</span>
+                            車両管理・データシート
+                        </h2>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">車両の追加・編集・削除および走行ログデータの確認</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="openVehicleModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow flex items-center gap-1.5 transition-transform active:scale-95">
+                            <span class="material-symbols-outlined text-base">add</span> 新規車両の追加
+                        </button>
+                        <button onclick="openChangePasswordModal()" class="px-3 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl transition-colors">
+                            パスワード変更
+                        </button>
+                        <button onclick="adminLogout()" class="px-3 py-2 bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300 font-bold text-xs rounded-xl transition-colors">
+                            ログアウト
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Registered Vehicles Table -->
+                <div class="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+                    <div class="p-4 border-b border-slate-200 dark:border-slate-700 font-bold text-sm flex justify-between items-center">
+                        <span>登録済み車両一覧</span>
+                        <span class="text-xs text-slate-500">全<span id="adminVehicleCount">0</span>台</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300 font-bold">
+                                    <th class="p-3">識別カラー</th>
+                                    <th class="p-3">車両ID</th>
+                                    <th class="p-3">車両名称・ドライバー名</th>
+                                    <th class="p-3">オンライン状態</th>
+                                    <th class="p-3">最終更新時刻</th>
+                                    <th class="p-3 text-right">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminVehicleTableBody" class="divide-y divide-slate-200 dark:divide-slate-700">
+                                <!-- Dynamic Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Data Sheet JSON Views -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col h-64">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold text-xs flex items-center gap-1">
+                                <span class="material-symbols-outlined text-sm">data_object</span> current.json (最新位置)
+                            </span>
+                            <button onclick="copyToClipboard('jsonCurrent')" class="text-xs text-brand-600 hover:underline">コピー</button>
+                        </div>
+                        <textarea id="jsonCurrent" readonly class="flex-1 w-full bg-slate-900 text-emerald-400 p-3 rounded-xl font-mono text-xs overflow-y-auto resize-none"></textarea>
+                    </div>
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col h-64">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold text-xs flex items-center gap-1">
+                                <span class="material-symbols-outlined text-sm">history</span> history.json (走行履歴)
+                            </span>
+                            <button onclick="copyToClipboard('jsonHistory')" class="text-xs text-brand-600 hover:underline">コピー</button>
+                        </div>
+                        <textarea id="jsonHistory" readonly class="flex-1 w-full bg-slate-900 text-sky-400 p-3 rounded-xl font-mono text-xs overflow-y-auto resize-none"></textarea>
+                    </div>
+                </div>
+            </div>
+
+        </section>
     </main>
-  </div>
 
-  <!-- GITHUB SETTINGS MODAL -->
-  <div id="settingsModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white dark:bg-google-darkSurface border border-gray-200 dark:border-google-darkBorder w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
-      <div class="flex items-center justify-between border-b border-gray-100 dark:border-google-darkBorder pb-3">
-        <h3 class="font-bold text-base flex items-center gap-2">
-          <span class="material-symbols-outlined text-google-blue">cloud_sync</span> GitHub データ連携設定
-        </h3>
-        <button id="closeSettingsBtn" class="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-google-darkCard">
-          <span class="material-symbols-outlined">close</span>
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="md:hidden bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex justify-around p-2 shrink-0 z-30 shadow-lg">
+        <button onclick="switchView('map')" id="mob-tab-map" class="flex flex-col items-center gap-1 text-brand-600 dark:text-brand-500 font-bold text-xs">
+            <span class="material-symbols-outlined text-2xl">map</span> 地図画面
         </button>
-      </div>
+        <button onclick="switchView('driver')" id="mob-tab-driver" class="flex flex-col items-center gap-1 text-slate-500 dark:text-slate-400 text-xs">
+            <span class="material-symbols-outlined text-2xl">navigation</span> 送信画面
+        </button>
+        <button onclick="switchView('admin')" id="mob-tab-admin" class="flex flex-col items-center gap-1 text-slate-500 dark:text-slate-400 text-xs">
+            <span class="material-symbols-outlined text-2xl">admin_panel_settings</span> 管理画面
+        </button>
+    </nav>
 
-      <p class="text-xs text-gray-500 dark:text-gray-400">
-        GitHubリポジトリに `current_positions.json` および `history_logs.json` を直接自動書き込み/同期するためのPersonal Access Tokenを設定します。
-      </p>
+    <!-- MODAL: Vehicle Add / Edit -->
+    <div id="vehicleModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4">
+            <h3 id="vehicleModalTitle" class="text-lg font-bold">車両情報の追加・編集</h3>
+            
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">車両ID (例: CAR-001)</label>
+                    <input type="text" id="modalVehicleId" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">車両名称 / ドライバー名</label>
+                    <input type="text" id="modalVehicleName" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">表示カラー</label>
+                    <input type="color" id="modalVehicleColor" class="w-full h-10 p-1 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 cursor-pointer" value="#6366f1">
+                </div>
+            </div>
 
-      <div class="space-y-3 text-sm">
-        <div>
-          <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">GitHub Personal Access Token (PAT)</label>
-          <input type="password" id="ghPatInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" class="w-full p-2.5 bg-gray-50 dark:bg-google-darkCard border border-gray-300 dark:border-google-darkBorder rounded-lg font-mono text-xs focus:ring-2 focus:ring-google-blue outline-none">
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeVehicleModal()" class="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold">キャンセル</button>
+                <button onclick="saveVehicleModal()" class="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow">保存する</button>
+            </div>
         </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">リポジトリ オーナー</label>
-            <input type="text" id="ghOwnerInput" placeholder="username" class="w-full p-2 bg-gray-50 dark:bg-google-darkCard border border-gray-300 dark:border-google-darkBorder rounded-lg text-xs outline-none">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">リポジトリ名</label>
-            <input type="text" id="ghRepoInput" placeholder="fleet-data-repo" class="w-full p-2 bg-gray-50 dark:bg-google-darkCard border border-gray-300 dark:border-google-darkBorder rounded-lg text-xs outline-none">
-          </div>
-        </div>
-      </div>
-
-      <div class="pt-2 flex gap-2">
-        <button id="saveSettingsBtn" class="flex-1 py-2.5 bg-google-blue hover:bg-google-blueHover text-white font-bold rounded-lg text-xs transition">
-          設定を保存して接続
-        </button>
-        <button id="useLocalStorageBtn" class="py-2.5 px-4 bg-gray-100 hover:bg-gray-200 dark:bg-google-darkCard dark:hover:bg-google-darkBorder text-gray-700 dark:text-gray-300 font-bold rounded-lg text-xs transition">
-          ローカル動作
-        </button>
-      </div>
     </div>
-  </div>
 
-  <!-- NOTIFICATION TOAST -->
-  <div id="toast" class="fixed top-16 right-4 z-50 transform translate-y-[-100%] opacity-0 transition-all duration-300 bg-gray-900 text-white dark:bg-white dark:text-gray-900 text-xs px-4 py-2.5 rounded-lg shadow-xl flex items-center gap-2 pointer-events-none">
-    <span class="material-symbols-outlined text-sm text-google-green" id="toastIcon">check_circle</span>
-    <span id="toastMessage">設定が保存されました</span>
-  </div>
-
-  <!-- APPLICATION LOGIC CODE -->
-  <script>
-    /**
-     * Fleet Tracking System Engine
-     */
-
-    // --- State Storage & Configuration ---
-    const STATE = {
-      darkMode: false,
-      activeTab: 'driver', // 'driver' | 'admin'
-      isTracking: false,
-      simulatingDrive: false,
-      simInterval: null,
-      watchId: null,
-      selectedVehicleId: 'CAR-001',
-
-      // Data store
-      vehicles: {
-        'CAR-001': { id: 'CAR-001', name: '車両A [愛知 500 さ 12-34]', driver: '佐藤 太郎', status: 'online', lat: 35.1815, lng: 136.9064, speed: 0, heading: 0, lastUpdate: Date.now() },
-        'CAR-002': { id: 'CAR-002', name: '車両B [名古屋 300 も 56-78]', driver: '鈴木 一郎', status: 'online', lat: 35.1709, lng: 136.8815, speed: 42.5, heading: 90, lastUpdate: Date.now() },
-        'CAR-003': { id: 'CAR-003', name: '車両C [三河 400 た 90-12]', driver: '高橋 健太', status: 'offline', lat: 35.1500, lng: 136.9200, speed: 0, heading: 180, lastUpdate: Date.now() - 3600000 },
-        'CAR-004': { id: 'CAR-004', name: '配送トラック 1号', driver: '田中 直樹', status: 'online', lat: 35.1950, lng: 136.9300, speed: 28.0, heading: 270, lastUpdate: Date.now() }
-      },
-
-      // Historical Logs
-      historyLogs: [],
-
-      // Playback state
-      playback: {
-        isPlaying: false,
-        speed: 1,
-        currentIndex: 0,
-        timer: null
-      },
-
-      // GitHub Credentials
-      github: {
-        pat: '',
-        owner: '',
-        repo: ''
-      },
-
-      // Previous GPS Position for speed calculation
-      prevPos: null
-    };
-
-    // --- Leaflet Map References ---
-    let map, mapLightTile, mapDarkTile;
-    const markers = {};
-    let playbackPolyline = null;
-
-    // --- DOM Elements ---
-    const el = {
-      themeToggleBtn: document.getElementById('themeToggleBtn'),
-      themeIcon: document.getElementById('themeIcon'),
-      tabDriverBtn: document.getElementById('tabDriverBtn'),
-      tabAdminBtn: document.getElementById('tabAdminBtn'),
-      driverPanel: document.getElementById('driverPanel'),
-      adminPanel: document.getElementById('adminPanel'),
-      vehicleSelect: document.getElementById('vehicleSelect'),
-      consentCheckbox: document.getElementById('consentCheckbox'),
-      startGpsBtn: document.getElementById('startGpsBtn'),
-      toggleSimDriveBtn: document.getElementById('toggleSimDriveBtn'),
-      currentSpeedDisplay: document.getElementById('currentSpeedDisplay'),
-      currentHeadingDisplay: document.getElementById('currentHeadingDisplay'),
-      headingArrow: document.getElementById('headingArrow'),
-      headingText: document.getElementById('headingText'),
-      latLngDisplay: document.getElementById('latLngDisplay'),
-      lastUpdatedDisplay: document.getElementById('lastUpdatedDisplay'),
-      vehicleListContainer: document.getElementById('vehicleListContainer'),
-      onlineCountBadge: document.getElementById('onlineCountBadge'),
-      
-      // Settings & GitHub
-      openSettingsBtn: document.getElementById('openSettingsBtn'),
-      closeSettingsBtn: document.getElementById('closeSettingsBtn'),
-      settingsModal: document.getElementById('settingsModal'),
-      saveSettingsBtn: document.getElementById('saveSettingsBtn'),
-      useLocalStorageBtn: document.getElementById('useLocalStorageBtn'),
-      ghPatInput: document.getElementById('ghPatInput'),
-      ghOwnerInput: document.getElementById('ghOwnerInput'),
-      ghRepoInput: document.getElementById('ghRepoInput'),
-      syncStatusDot: document.getElementById('syncStatusDot'),
-
-      // Playback Controls
-      historyTimeline: document.getElementById('historyTimeline'),
-      playPauseBtn: document.getElementById('playPauseBtn'),
-      playPauseIcon: document.getElementById('playPauseIcon'),
-      playbackTimeDisplay: document.getElementById('playbackTimeDisplay'),
-      liveReturnBtn: document.getElementById('liveReturnBtn'),
-      playbackModeBadge: document.getElementById('playbackModeBadge'),
-      
-      // Toast & Data Buttons
-      toast: document.getElementById('toast'),
-      toastMessage: document.getElementById('toastMessage'),
-      exportCsvBtn: document.getElementById('exportCsvBtn'),
-      exportJsonBtn: document.getElementById('exportJsonBtn'),
-      clearHistoryBtn: document.getElementById('clearHistoryBtn')
-    };
-
-    // --- INITIALIZATION ---
-    window.addEventListener('DOMContentLoaded', () => {
-      initTheme();
-      initMap();
-      initMockHistoryData();
-      setupEventListeners();
-      renderVehicleList();
-      loadSettings();
-    });
-
-    // --- THEME MANAGEMENT ---
-    function initTheme() {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const savedTheme = localStorage.getItem('fleet_theme');
-      STATE.darkMode = savedTheme ? savedTheme === 'dark' : prefersDark;
-      applyTheme();
-    }
-
-    function applyTheme() {
-      if (STATE.darkMode) {
-        document.documentElement.classList.add('dark');
-        el.themeIcon.textContent = 'light_mode';
-        if (map && mapDarkTile) {
-          map.removeLayer(mapLightTile);
-          mapDarkTile.addTo(map);
-        }
-      } else {
-        document.documentElement.classList.remove('dark');
-        el.themeIcon.textContent = 'dark_mode';
-        if (map && mapLightTile) {
-          map.removeLayer(mapDarkTile);
-          mapLightTile.addTo(map);
-        }
-      }
-      localStorage.setItem('fleet_theme', STATE.darkMode ? 'dark' : 'light');
-    }
-
-    // --- LEAFLET MAP SETUP ---
-    function initMap() {
-      // Centered at Nagoya, Japan as default initial position
-      map = L.map('map', { zoomControl: false }).setView([35.1815, 136.9064], 13);
-      L.control.zoom({ position: 'topright' }).addTo(map);
-
-      mapLightTile = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap contributors'
-      });
-
-      mapDarkTile = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap, © CARTO'
-      });
-
-      if (STATE.darkMode) {
-        mapDarkTile.addTo(map);
-      } else {
-        mapLightTile.addTo(map);
-      }
-
-      updateMapMarkers();
-    }
-
-    // Custom SVG Marker Generator
-    function createVehicleMarkerIcon(heading, isOnline, isSelected) {
-      const color = isOnline ? (isSelected ? '#1a73e8' : '#34a853') : '#9ca3af';
-      const svg = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="36" height="36">
-          <circle cx="16" cy="16" r="14" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2"/>
-          <g transform="rotate(${heading}, 16, 16)">
-            <path d="M16 6 L24 24 L16 20 L8 24 Z" fill="${color}" stroke="#ffffff" stroke-width="1.5"/>
-          </g>
-        </svg>
-      `;
-      return L.divIcon({
-        className: 'vehicle-marker-icon',
-        html: svg,
-        iconSize: [36, 36],
-        iconAnchor: [18, 18]
-      });
-    }
-
-    function updateMapMarkers() {
-      Object.values(STATE.vehicles).forEach(v => {
-        const isSelected = v.id === STATE.selectedVehicleId;
-        const icon = createVehicleMarkerIcon(v.heading, v.status === 'online', isSelected);
-
-        if (markers[v.id]) {
-          markers[v.id].setLatLng([v.lat, v.lng]);
-          markers[v.id].setIcon(icon);
-        } else {
-          const marker = L.marker([v.lat, v.lng], { icon }).addTo(map);
-          marker.bindPopup(`
-            <div class="font-sans text-xs p-1">
-              <strong class="block text-sm font-bold text-gray-800">${v.name}</strong>
-              <div class="text-gray-500">ドライバー: ${v.driver}</div>
-              <div class="text-blue-600 font-bold mt-1">速度: ${v.speed.toFixed(1)} km/h</div>
+    <!-- MODAL: GitHub API Config -->
+    <div id="configModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-bold flex items-center gap-2">
+                    <span class="material-symbols-outlined text-brand-600">settings</span> GitHub API 連携設定
+                </h3>
+                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-slate-600">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
             </div>
-          `);
-          markers[v.id] = marker;
+
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+                本物のGitHub Pages/リポジトリと通信する場合は各種情報を設定してください。未設定時はローカルのデモ/シミュレーターモードで動きます。
+            </p>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">GitHub ユーザー名 (Owner)</label>
+                    <input type="text" id="cfgOwner" placeholder="例: username" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-xs font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">リポジトリ名 (Repo)</label>
+                    <input type="text" id="cfgRepo" placeholder="例: fleet-tracker" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-xs font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Personal Access Token (PAT)</label>
+                    <input type="password" id="cfgToken" placeholder="ghp_xxxxxxxxxxxx" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-xs font-bold">
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeConfigModal()" class="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 text-xs font-bold">閉じる</button>
+                <button onclick="saveConfigModal()" class="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow">設定を保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Password Change -->
+    <div id="pwdModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4">
+            <h3 class="text-lg font-bold">管理者パスワードの変更</h3>
+            <div class="space-y-3">
+                <input type="password" id="newAdminPwd" placeholder="新しいパスワード" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm font-bold">
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeChangePasswordModal()" class="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-300">キャンセル</button>
+                <button onclick="saveNewPassword()" class="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow">更新</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dynamic Toast Notification Message Box -->
+    <div id="toast" class="fixed bottom-16 md:bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold transition-all duration-300 opacity-0 pointer-events-none z-50 flex items-center gap-2">
+        <span class="material-symbols-outlined text-base text-brand-400" id="toastIcon">info</span>
+        <span id="toastMsg">通知メッセージ</span>
+    </div>
+
+    <!-- Application Script Logic -->
+    <script>
+        // ------------------------------------------------------------------
+        // STATE MANAGEMENT
+        // ------------------------------------------------------------------
+        let state = {
+            adminAuthenticated: false,
+            adminPassword: localStorage.getItem('fleet_admin_pwd') || 'admin',
+            currentView: 'map',
+            theme: localStorage.getItem('fleet_theme') || 'light',
+            githubConfig: JSON.parse(localStorage.getItem('fleet_gh_config') || '{"owner":"","repo":"","token":""}'),
+            
+            // Vehicles Data State
+            vehicles: JSON.parse(localStorage.getItem('fleet_vehicles') || JSON.stringify({
+                "CAR-001": { id: "CAR-001", name: "1号車 (名古屋営業)", color: "#6366f1", lat: 35.1549, lng: 136.9639, speed: 0, heading: 0, online: true, lastUpdated: new Date().toISOString() },
+                "CAR-002": { id: "CAR-002", name: "2号車 (配送トラック)", color: "#ec4899", lat: 35.1709, lng: 136.8815, speed: 38.5, heading: 90, online: true, lastUpdated: new Date().toISOString() }
+            })),
+
+            // Telemetry Historical Logs
+            historyLogs: JSON.parse(localStorage.getItem('fleet_history') || '[]'),
+
+            // GPS Driver Mode Tracking State
+            gpsWatchId: null,
+            isTracking: false,
+            activeDriverVehicleId: "CAR-001",
+            lastPos: null,
+
+            // Playback Slider State
+            playbackActive: false,
+            playbackIndex: 0,
+            playbackSpeed: 1,
+            playbackTimer: null
+        };
+
+        let map, mapMarkers = {}, mapPolyline = null;
+        let editingVehicleId = null;
+
+        // ------------------------------------------------------------------
+        // INITIALIZATION ON LOAD
+        // ------------------------------------------------------------------
+        window.onload = function() {
+            initTheme();
+            initLeafletMap();
+            populateVehicleSelects();
+            renderVehicleLists();
+            startSimulatedUpdates();
+            updateJsonViews();
+        };
+
+        // ------------------------------------------------------------------
+        // LEAFLET & OPENSTREETMAP (OSM) INTEGRATION
+        // ------------------------------------------------------------------
+        function initLeafletMap() {
+            // Default Center: Nagoya Station Coordinates
+            map = L.map('leafletMap', {
+                zoomControl: true,
+                attributionControl: true
+            }).setView([35.1709, 136.8815], 13);
+
+            // OpenStreetMap Standard Tile Layer Integration
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            updateMapMarkers();
         }
-      });
-    }
 
-    // --- HAVERSINE FORMULA FOR DISTANCE & SPEED ---
-    function calculateDistance(lat1, lon1, lat2, lon2) {
-      const R = 6371; // Earth radius in km
-      const dLat = (lat2 - lat1) * Math.PI / 180;
-      const dLon = (lon2 - lon1) * Math.PI / 180;
-      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return R * c; // Distance in km
-    }
+        function updateMapMarkers() {
+            if (!map) return;
 
-    function calculateHeading(lat1, lon1, lat2, lon2) {
-      const dLon = (lon2 - lon1) * Math.PI / 180;
-      const y = Math.sin(dLon) * Math.cos(lat2 * Math.PI / 180);
-      const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
-                Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLon);
-      let brng = Math.atan2(y, x) * 180 / Math.PI;
-      return (brng + 360) % 360;
-    }
+            Object.values(state.vehicles).forEach(v => {
+                if (!mapMarkers[v.id]) {
+                    // Custom SVG Marker Icon with Vehicle Color
+                    const svgIcon = L.divIcon({
+                        className: 'custom-vehicle-marker',
+                        html: `
+                            <div style="transform: rotate(${v.heading || 0}deg);" class="transition-transform duration-300">
+                                <div style="background-color: ${v.color};" class="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-lg border-2 border-white dark:border-slate-800">
+                                    <span class="material-symbols-outlined text-lg">navigation</span>
+                                </div>
+                            </div>
+                        `,
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16]
+                    });
 
-    function getHeadingText(deg) {
-      const dirs = ['北', '北東', '東', '南東', '南', '南西', '西', '北西'];
-      return dirs[Math.round(deg / 45) % 8];
-    }
-
-    // --- GPS REALTIME TRACKING ---
-    function handleGpsPosition(pos) {
-      const { latitude: lat, longitude: lng, speed: rawSpeed, heading: rawHeading } = pos.coords;
-      const now = Date.now();
-      let calculatedSpeed = 0;
-      let calculatedHeading = 0;
-
-      if (STATE.prevPos) {
-        const timeDeltaHr = (now - STATE.prevPos.time) / 3600000;
-        const distKm = calculateDistance(STATE.prevPos.lat, STATE.prevPos.lng, lat, lng);
-        if (timeDeltaHr > 0) {
-          calculatedSpeed = distKm / timeDeltaHr;
+                    const marker = L.marker([v.lat, v.lng], { icon: svgIcon }).addTo(map);
+                    marker.bindPopup(`
+                        <div class="text-xs p-1">
+                            <strong style="color: ${v.color}">${v.name}</strong> (${v.id})<br>
+                            速度: ${v.speed.toFixed(1)} km/h<br>
+                            最終更新: ${new Date(v.lastUpdated).toLocaleTimeString()}
+                        </div>
+                    `);
+                    mapMarkers[v.id] = marker;
+                } else {
+                    mapMarkers[v.id].setLatLng([v.lat, v.lng]);
+                    // Update Marker Rotation and Popup Content
+                    const iconElem = mapMarkers[v.id].getElement();
+                    if (iconElem) {
+                        const rotInner = iconElem.querySelector('.transition-transform');
+                        if (rotInner) rotInner.style.transform = `rotate(${v.heading || 0}deg)`;
+                    }
+                    mapMarkers[v.id].getPopup().setContent(`
+                        <div class="text-xs p-1">
+                            <strong style="color: ${v.color}">${v.name}</strong> (${v.id})<br>
+                            速度: ${v.speed.toFixed(1)} km/h<br>
+                            最終更新: ${new Date(v.lastUpdated).toLocaleTimeString()}
+                        </div>
+                    `);
+                }
+            });
         }
-        calculatedHeading = calculateHeading(STATE.prevPos.lat, STATE.prevPos.lng, lat, lng);
-      }
 
-      STATE.prevPos = { lat, lng, time: now };
-
-      const speed = rawSpeed !== null ? rawSpeed * 3.6 : calculatedSpeed;
-      const heading = rawHeading !== null ? rawHeading : calculatedHeading;
-
-      // Update state
-      const targetVehicle = STATE.vehicles[STATE.selectedVehicleId];
-      if (targetVehicle) {
-        targetVehicle.lat = lat;
-        targetVehicle.lng = lng;
-        targetVehicle.speed = speed;
-        targetVehicle.heading = heading;
-        targetVehicle.lastUpdate = now;
-        targetVehicle.status = 'online';
-
-        // Record history log entry
-        logTelemetryData(targetVehicle);
-      }
-
-      updateDriverUI(lat, lng, speed, heading, now);
-      updateMapMarkers();
-      renderVehicleList();
-      syncDataToGithub();
-    }
-
-    function updateDriverUI(lat, lng, speed, heading, timestamp) {
-      el.currentSpeedDisplay.innerHTML = `${speed.toFixed(1)} <span class="text-xs font-normal text-gray-500">km/h</span>`;
-      el.headingArrow.style.transform = `rotate(${heading}deg)`;
-      el.headingText.textContent = getHeadingText(heading);
-      el.latLngDisplay.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-      el.lastUpdatedDisplay.textContent = new Date(timestamp).toLocaleTimeString();
-    }
-
-    // --- MOCK DRIVING SIMULATOR FOR DEMO ---
-    function toggleSimulatedDrive() {
-      if (STATE.simulatingDrive) {
-        clearInterval(STATE.simInterval);
-        STATE.simulatingDrive = false;
-        el.toggleSimDriveBtn.classList.remove('bg-red-50', 'text-google-red');
-        el.toggleSimDriveBtn.innerHTML = `<span class="material-symbols-outlined text-base">route</span> 【デモ用】走行シミュレータ起動`;
-        showToast('シミュレータを停止しました');
-      } else {
-        STATE.simulatingDrive = true;
-        el.toggleSimDriveBtn.classList.add('bg-red-50', 'text-google-red');
-        el.toggleSimDriveBtn.innerHTML = `<span class="material-symbols-outlined text-base">stop</span> シミュレータ停止`;
-        showToast('走行デモシミュレータを開始しました');
-
-        let angle = 0;
-        STATE.simInterval = setInterval(() => {
-          const v = STATE.vehicles[STATE.selectedVehicleId];
-          angle += 0.05;
-          const deltaLat = Math.sin(angle) * 0.0015;
-          const deltaLng = Math.cos(angle) * 0.0015;
-
-          const fakePos = {
-            coords: {
-              latitude: v.lat + deltaLat,
-              longitude: v.lng + deltaLng,
-              speed: 35 + Math.random() * 15,
-              heading: (angle * 57.29) % 360
+        function focusOnVehicle(id) {
+            const v = state.vehicles[id];
+            if (v && map) {
+                map.flyTo([v.lat, v.lng], 16, { duration: 1 });
+                if (mapMarkers[id]) mapMarkers[id].openPopup();
             }
-          };
-          handleGpsPosition(fakePos);
-        }, 2000);
-      }
-    }
-
-    // --- DATA SHEET & HISTORY LOGGING ---
-    function logTelemetryData(vehicle) {
-      const entry = {
-        id: vehicle.id,
-        name: vehicle.name,
-        timestamp: new Date().toISOString(),
-        lat: vehicle.lat,
-        lng: vehicle.lng,
-        speed: vehicle.speed,
-        heading: vehicle.heading
-      };
-      STATE.historyLogs.push(entry);
-      localStorage.setItem('fleet_history_logs', JSON.stringify(STATE.historyLogs.slice(-500))); // Keep last 500 points locally
-    }
-
-    function initMockHistoryData() {
-      const now = Date.now();
-      const logs = [];
-      const v = STATE.vehicles['CAR-001'];
-      let lat = v.lat - 0.05;
-      let lng = v.lng - 0.05;
-
-      for (let i = 0; i < 30; i++) {
-        lat += 0.0015 + Math.random() * 0.0005;
-        lng += 0.0018 + Math.random() * 0.0005;
-        logs.push({
-          id: 'CAR-001',
-          name: v.name,
-          timestamp: new Date(now - (30 - i) * 60000).toISOString(),
-          lat: lat,
-          lng: lng,
-          speed: 20 + Math.sin(i) * 15,
-          heading: 45
-        });
-      }
-      STATE.historyLogs = logs;
-    }
-
-    // --- HISTORICAL PLAYBACK CONTROLLER (Weather Radar Style) ---
-    function updatePlaybackView(index) {
-      if (STATE.historyLogs.length === 0) return;
-
-      const log = STATE.historyLogs[index];
-      if (!log) return;
-
-      el.playbackTimeDisplay.textContent = new Date(log.timestamp).toLocaleString();
-      el.playbackModeBadge.textContent = '再生モード中';
-      el.playbackModeBadge.className = 'text-[10px] px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 font-bold';
-
-      // Plot historical polyline up to index
-      const points = STATE.historyLogs.slice(0, index + 1).map(l => [l.lat, l.lng]);
-      if (playbackPolyline) {
-        playbackPolyline.setLatLngs(points);
-      } else {
-        playbackPolyline = L.polyline(points, { color: '#1a73e8', weight: 4, opacity: 0.8, dashArray: '6, 6' }).addTo(map);
-      }
-
-      // Temporarily set vehicle marker at historical point
-      if (markers['CAR-001']) {
-        markers['CAR-001'].setLatLng([log.lat, log.lng]);
-        markers['CAR-001'].setIcon(createVehicleMarkerIcon(log.heading, true, true));
-      }
-
-      map.panTo([log.lat, log.lng]);
-    }
-
-    function togglePlayback() {
-      if (STATE.playback.isPlaying) {
-        clearInterval(STATE.playback.timer);
-        STATE.playback.isPlaying = false;
-        el.playPauseIcon.textContent = 'play_arrow';
-      } else {
-        STATE.playback.isPlaying = true;
-        el.playPauseIcon.textContent = 'pause';
-
-        STATE.playback.timer = setInterval(() => {
-          let curr = parseInt(el.historyTimeline.value);
-          if (curr >= STATE.historyLogs.length - 1) {
-            curr = 0;
-          } else {
-            curr++;
-          }
-          el.historyTimeline.value = curr;
-          updatePlaybackView(curr);
-        }, 1000 / STATE.playback.speed);
-      }
-    }
-
-    function resetToLiveView() {
-      if (STATE.playback.isPlaying) togglePlayback();
-      if (playbackPolyline) {
-        map.removeLayer(playbackPolyline);
-        playbackPolyline = null;
-      }
-      el.playbackModeBadge.textContent = 'ライブ表示中';
-      el.playbackModeBadge.className = 'text-[10px] px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300';
-      el.playbackTimeDisplay.textContent = '--:--:--';
-      updateMapMarkers();
-      showToast('リアルタイム表示に戻りました');
-    }
-
-    // --- GITHUB INTEGRATION API ---
-    async function syncDataToGithub() {
-      if (!STATE.github.pat || !STATE.github.owner || !STATE.github.repo) return;
-
-      try {
-        const path = 'current_positions.json';
-        const url = `https://api.github.com/repos/${STATE.github.owner}/${STATE.github.repo}/contents/${path}`;
-        const content = btoa(unescape(encodeURIComponent(JSON.stringify(STATE.vehicles, null, 2))));
-
-        // Fetch SHA if existing
-        let sha = null;
-        const res = await fetch(url, { headers: { Authorization: `token ${STATE.github.pat}` } });
-        if (res.ok) {
-          const data = await res.json();
-          sha = data.sha;
         }
 
-        // Put Content
-        await fetch(url, {
-          method: 'PUT',
-          headers: {
-            Authorization: `token ${STATE.github.pat}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            message: 'Update fleet position telemetry',
-            content: content,
-            sha: sha
-          })
-        });
+        // ------------------------------------------------------------------
+        // DRIVER GPS TRANSMITTER LOGIC
+        // ------------------------------------------------------------------
+        function toggleGpsTracking() {
+            if (state.isTracking) {
+                // Stop Tracking
+                if (state.gpsWatchId) navigator.geolocation.clearWatch(state.gpsWatchId);
+                state.isTracking = false;
+                document.getElementById('toggleGpsBtn').classList.replace('bg-rose-600', 'bg-brand-600');
+                document.getElementById('toggleGpsBtn').innerHTML = `<span class="material-symbols-outlined text-xl">play_arrow</span> 送信開始`;
+                document.getElementById('gpsStatusText').innerText = "停止中";
+                showToast("GPS位置情報の送信を停止しました", "info");
+            } else {
+                // Start Tracking
+                if (!navigator.geolocation) {
+                    showToast("お使いのブラウザはGeolocationに対応していません", "warning");
+                    return;
+                }
 
-        el.syncStatusDot.className = 'absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-google-darkSurface';
-      } catch (err) {
-        console.error('GitHub Sync Failed:', err);
-        el.syncStatusDot.className = 'absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-google-darkSurface';
-      }
-    }
+                state.activeDriverVehicleId = document.getElementById('driverVehicleSelect').value;
+                state.isTracking = true;
 
-    // --- RENDER ADMIN LIST & UI ---
-    function renderVehicleList() {
-      const container = el.vehicleListContainer;
-      container.innerHTML = '';
-      let activeCount = 0;
+                document.getElementById('toggleGpsBtn').classList.replace('bg-brand-600', 'bg-rose-600');
+                document.getElementById('toggleGpsBtn').innerHTML = `<span class="material-symbols-outlined text-xl">stop</span> 送信停止`;
+                document.getElementById('gpsStatusText').innerText = "リアルタイム送信中...";
 
-      Object.values(STATE.vehicles).forEach(v => {
-        if (v.status === 'online') activeCount++;
-        const item = document.createElement('div');
-        item.className = `p-2.5 rounded-lg border flex items-center justify-between text-xs transition ${
-          v.id === STATE.selectedVehicleId
-            ? 'bg-blue-50/50 dark:bg-blue-950/30 border-google-blue'
-            : 'bg-white dark:bg-google-darkSurface border-gray-200 dark:border-google-darkBorder'
-        }`;
-
-        item.innerHTML = `
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full ${v.status === 'online' ? 'bg-green-500' : 'bg-gray-400'}"></span>
-            <div>
-              <div class="font-bold text-gray-800 dark:text-gray-200">${v.name}</div>
-              <div class="text-[10px] text-gray-400">乗務員: ${v.driver}</div>
-            </div>
-          </div>
-          <div class="text-right">
-            <div class="font-bold ${v.speed > 0 ? 'text-google-blue' : 'text-gray-400'}">${v.speed.toFixed(1)} km/h</div>
-            <button onclick="toggleVehicleStatus('${v.id}')" class="text-[10px] underline text-gray-400 hover:text-gray-600">
-              ${v.status === 'online' ? 'ログアウト' : 'ログイン'}
-            </button>
-          </div>
-        `;
-        container.appendChild(item);
-      });
-
-      el.onlineCountBadge.textContent = `${activeCount} 台稼働中`;
-    }
-
-    window.toggleVehicleStatus = function(id) {
-      if (STATE.vehicles[id]) {
-        STATE.vehicles[id].status = STATE.vehicles[id].status === 'online' ? 'offline' : 'online';
-        if (STATE.vehicles[id].status === 'offline') STATE.vehicles[id].speed = 0;
-        updateMapMarkers();
-        renderVehicleList();
-        showToast(`${STATE.vehicles[id].name} のステータスを変更しました`);
-      }
-    };
-
-    // --- EVENT LISTENERS SETUP ---
-    function setupEventListeners() {
-      // Theme Toggle
-      el.themeToggleBtn.addEventListener('click', () => {
-        STATE.darkMode = !STATE.darkMode;
-        applyTheme();
-      });
-
-      // Navigation Tabs Switch
-      el.tabDriverBtn.addEventListener('click', () => switchTab('driver'));
-      el.tabAdminBtn.addEventListener('click', () => switchTab('admin'));
-
-      // Consent Checkbox for GPS
-      el.consentCheckbox.addEventListener('change', (e) => {
-        el.startGpsBtn.disabled = !e.target.checked;
-        if (e.target.checked) {
-          el.startGpsBtn.classList.remove('bg-gray-300', 'dark:bg-gray-700', 'text-gray-500', 'cursor-not-allowed');
-          el.startGpsBtn.classList.add('bg-google-blue', 'hover:bg-google-blueHover', 'text-white', 'shadow-md');
-        } else {
-          el.startGpsBtn.classList.add('bg-gray-300', 'dark:bg-gray-700', 'text-gray-500', 'cursor-not-allowed');
-          el.startGpsBtn.classList.remove('bg-google-blue', 'hover:bg-google-blueHover', 'text-white', 'shadow-md');
+                state.gpsWatchId = navigator.geolocation.watchPosition(
+                    handleGpsPosition,
+                    handleGpsError,
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+                showToast("位置情報のトラッキングを開始しました", "success");
+            }
         }
-      });
 
-      // GPS Toggle Button
-      el.startGpsBtn.addEventListener('click', () => {
-        if (STATE.isTracking) {
-          if (STATE.watchId) navigator.geolocation.clearWatch(STATE.watchId);
-          STATE.isTracking = false;
-          el.startGpsBtn.innerHTML = `<span class="material-symbols-outlined">location_searching</span> 位置情報送信を開始`;
-          showToast('GPS送信を停止しました');
-        } else {
-          if ('geolocation' in navigator) {
-            STATE.watchId = navigator.geolocation.watchPosition(
-              handleGpsPosition,
-              (err) => showToast('GPSエラー: ' + err.message, true),
-              { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-            STATE.isTracking = true;
-            el.startGpsBtn.innerHTML = `<span class="material-symbols-outlined">stop</span> 位置情報送信を停止`;
-            showToast('リアルタイムGPS送信中...');
-          } else {
-            showToast('お使いの端末は位置情報をサポートしていません', true);
-          }
+        function handleGpsPosition(pos) {
+            const { latitude, longitude, speed, heading, accuracy } = pos.coords;
+            const now = new Date();
+
+            let calculatedSpeed = speed ? (speed * 3.6) : 0; // m/s to km/h
+            let calculatedHeading = heading || 0;
+
+            // Calculate speed/heading manually if Geolocation API doesn't provide them directly
+            if (state.lastPos && (!speed || !heading)) {
+                const dt = (now - state.lastPos.time) / 1000;
+                if (dt > 0) {
+                    const dist = calculateDistance(state.lastPos.lat, state.lastPos.lng, latitude, longitude);
+                    calculatedSpeed = (dist / dt) * 3.6;
+                    calculatedHeading = calculateBearing(state.lastPos.lat, state.lastPos.lng, latitude, longitude);
+                }
+            }
+
+            state.lastPos = { lat: latitude, lng: longitude, time: now };
+
+            // Update Active Vehicle Telemetry State
+            const vId = state.activeDriverVehicleId;
+            if (state.vehicles[vId]) {
+                state.vehicles[vId].lat = latitude;
+                state.vehicles[vId].lng = longitude;
+                state.vehicles[vId].speed = calculatedSpeed;
+                state.vehicles[vId].heading = calculatedHeading;
+                state.vehicles[vId].online = true;
+                state.vehicles[vId].lastUpdated = now.toISOString();
+
+                // Append to Historical Log State
+                state.historyLogs.push({
+                    vehicleId: vId,
+                    lat: latitude,
+                    lng: longitude,
+                    speed: calculatedSpeed,
+                    heading: calculatedHeading,
+                    timestamp: now.toISOString()
+                });
+            }
+
+            // UI Telemetry Displays Update
+            document.getElementById('liveSpeed').innerText = calculatedSpeed.toFixed(1);
+            document.getElementById('liveHeading').innerText = `${Math.round(calculatedHeading)}°`;
+            document.getElementById('liveHeadingCardinal').innerText = getCardinalDirection(calculatedHeading);
+            document.getElementById('liveCoords').innerText = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+            document.getElementById('liveAccuracy').innerText = `±${Math.round(accuracy)}m`;
+            document.getElementById('liveLastUpdate').innerText = now.toLocaleTimeString();
+
+            saveAndSyncData();
         }
-      });
 
-      // Simulation Drive Button
-      el.toggleSimDriveBtn.addEventListener('click', toggleSimulatedDrive);
+        function handleGpsError(err) {
+            showToast(`GPSエラー: ${err.message}`, "warning");
+        }
 
-      // Vehicle Select Dropdown Change
-      el.vehicleSelect.addEventListener('change', (e) => {
-        STATE.selectedVehicleId = e.target.value;
-        updateMapMarkers();
-        renderVehicleList();
-      });
+        // ------------------------------------------------------------------
+        // ADMIN MANAGEMENT & AUTHENTICATION
+        // ------------------------------------------------------------------
+        function attemptAdminLogin() {
+            const pwdInput = document.getElementById('adminPasswordInput').value;
+            if (pwdInput === state.adminPassword) {
+                state.adminAuthenticated = true;
+                document.getElementById('adminAuthCard').classList.add('hidden');
+                document.getElementById('adminPanel').classList.remove('hidden');
+                showToast("管理者ログインに成功しました", "success");
+            } else {
+                showToast("パスワードが正しくありません", "warning");
+            }
+        }
 
-      // Settings Modal Triggers
-      el.openSettingsBtn.addEventListener('click', () => el.settingsModal.classList.remove('hidden'));
-      el.closeSettingsBtn.addEventListener('click', () => el.settingsModal.classList.add('hidden'));
+        function adminLogout() {
+            state.adminAuthenticated = false;
+            document.getElementById('adminAuthCard').classList.remove('hidden');
+            document.getElementById('adminPanel').classList.add('hidden');
+            document.getElementById('adminPasswordInput').value = '';
+            showToast("ログアウトしました", "info");
+        }
 
-      el.saveSettingsBtn.addEventListener('click', () => {
-        STATE.github.pat = el.ghPatInput.value.trim();
-        STATE.github.owner = el.ghOwnerInput.value.trim();
-        STATE.github.repo = el.ghRepoInput.value.trim();
-        localStorage.setItem('fleet_github_cfg', JSON.stringify(STATE.github));
-        el.settingsModal.classList.add('hidden');
-        showToast('GitHub 連携設定を保存しました');
-        syncDataToGithub();
-      });
+        function openChangePasswordModal() {
+            document.getElementById('pwdModal').classList.remove('hidden');
+        }
+        function closeChangePasswordModal() {
+            document.getElementById('pwdModal').classList.add('hidden');
+        }
+        function saveNewPassword() {
+            const newPwd = document.getElementById('newAdminPwd').value;
+            if (newPwd.trim().length > 0) {
+                state.adminPassword = newPwd;
+                localStorage.setItem('fleet_admin_pwd', newPwd);
+                closeChangePasswordModal();
+                showToast("管理者パスワードを更新しました", "success");
+            }
+        }
 
-      el.useLocalStorageBtn.addEventListener('click', () => {
-        el.settingsModal.classList.add('hidden');
-        showToast('ローカルモードで動作中');
-      });
+        // Vehicle Edit/Add Modals
+        function openVehicleModal(id = null) {
+            editingVehicleId = id;
+            if (id && state.vehicles[id]) {
+                const v = state.vehicles[id];
+                document.getElementById('vehicleModalTitle').innerText = "車両情報の編集";
+                document.getElementById('modalVehicleId').value = v.id;
+                document.getElementById('modalVehicleId').disabled = true;
+                document.getElementById('modalVehicleName').value = v.name;
+                document.getElementById('modalVehicleColor').value = v.color || "#6366f1";
+            } else {
+                document.getElementById('vehicleModalTitle').innerText = "新規車両の追加";
+                document.getElementById('modalVehicleId').value = `CAR-00${Object.keys(state.vehicles).length + 1}`;
+                document.getElementById('modalVehicleId').disabled = false;
+                document.getElementById('modalVehicleName').value = "";
+                document.getElementById('modalVehicleColor').value = "#6366f1";
+            }
+            document.getElementById('vehicleModal').classList.remove('hidden');
+        }
 
-      // Timeline Slider & Playback
-      el.historyTimeline.addEventListener('input', (e) => {
-        const val = parseInt(e.target.value);
-        const maxIndex = STATE.historyLogs.length - 1;
-        const targetIndex = Math.floor((val / 100) * maxIndex);
-        updatePlaybackView(targetIndex);
-      });
+        function closeVehicleModal() {
+            document.getElementById('vehicleModal').classList.add('hidden');
+        }
 
-      el.playPauseBtn.addEventListener('click', togglePlayback);
-      el.liveReturnBtn.addEventListener('click', resetToLiveView);
+        function saveVehicleModal() {
+            const vId = document.getElementById('modalVehicleId').value.trim();
+            const name = document.getElementById('modalVehicleName').value.trim();
+            const color = document.getElementById('modalVehicleColor').value;
 
-      // Speed playback buttons
-      document.querySelectorAll('.speed-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('font-bold', 'text-google-blue'));
-          e.target.classList.add('font-bold', 'text-google-blue');
-          STATE.playback.speed = parseInt(e.target.dataset.speed);
-          if (STATE.playback.isPlaying) {
-            togglePlayback();
-            togglePlayback();
-          }
-        });
-      });
+            if (!vId || !name) {
+                showToast("車両IDと名前を入力してください", "warning");
+                return;
+            }
 
-      // Data Exports & Purge
-      el.exportJsonBtn.addEventListener('click', () => {
-        downloadFile('fleet_telemetry_logs.json', JSON.stringify(STATE.historyLogs, null, 2), 'application/json');
-      });
+            if (editingVehicleId) {
+                // Update Existing
+                state.vehicles[editingVehicleId].name = name;
+                state.vehicles[editingVehicleId].color = color;
+            } else {
+                // Create New
+                state.vehicles[vId] = {
+                    id: vId,
+                    name: name,
+                    color: color,
+                    lat: 35.1709 + (Math.random() - 0.5) * 0.05,
+                    lng: 136.8815 + (Math.random() - 0.5) * 0.05,
+                    speed: 0,
+                    heading: 0,
+                    online: true,
+                    lastUpdated: new Date().toISOString()
+                };
+            }
 
-      el.exportCsvBtn.addEventListener('click', () => {
-        if (STATE.historyLogs.length === 0) return showToast('データが存在しません', true);
-        const headers = ['Timestamp', 'Vehicle ID', 'Vehicle Name', 'Latitude', 'Longitude', 'Speed(km/h)', 'Heading'];
-        const rows = STATE.historyLogs.map(l => [l.timestamp, l.id, `"${l.name}"`, l.lat, l.lng, l.speed.toFixed(2), l.heading]);
-        const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-        downloadFile('fleet_telemetry_logs.csv', csvContent, 'text/csv');
-      });
+            closeVehicleModal();
+            saveAndSyncData();
+            populateVehicleSelects();
+            showToast("車両情報を保存しました", "success");
+        }
 
-      el.clearHistoryBtn.addEventListener('click', () => {
-        STATE.historyLogs = [];
-        localStorage.removeItem('fleet_history_logs');
-        resetToLiveView();
-        showToast('すべての履歴ログを削除しました');
-      });
-    }
+        function deleteVehicle(id) {
+            if (confirm(`車両 ${id} を削除してもよろしいですか？`)) {
+                delete state.vehicles[id];
+                if (mapMarkers[id]) {
+                    map.removeLayer(mapMarkers[id]);
+                    delete mapMarkers[id];
+                }
+                saveAndSyncData();
+                populateVehicleSelects();
+                showToast("車両を削除しました", "info");
+            }
+        }
 
-    function switchTab(tab) {
-      STATE.activeTab = tab;
-      if (tab === 'driver') {
-        el.driverPanel.classList.remove('hidden');
-        el.adminPanel.classList.add('hidden');
-        el.tabDriverBtn.className = 'flex-1 py-3 text-sm font-bold text-google-blue border-b-2 border-google-blue flex items-center justify-center gap-1.5 transition-colors';
-        el.tabAdminBtn.className = 'flex-1 py-3 text-sm font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 border-b-2 border-transparent flex items-center justify-center gap-1.5 transition-colors';
-      } else {
-        el.driverPanel.classList.add('hidden');
-        el.adminPanel.classList.remove('hidden');
-        el.tabAdminBtn.className = 'flex-1 py-3 text-sm font-bold text-google-blue border-b-2 border-google-blue flex items-center justify-center gap-1.5 transition-colors';
-        el.tabDriverBtn.className = 'flex-1 py-3 text-sm font-medium text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 border-b-2 border-transparent flex items-center justify-center gap-1.5 transition-colors';
-      }
-    }
+        function toggleVehicleOnlineStatus(id) {
+            if (state.vehicles[id]) {
+                state.vehicles[id].online = !state.vehicles[id].online;
+                saveAndSyncData();
+            }
+        }
 
-    function loadSettings() {
-      const savedCfg = localStorage.getItem('fleet_github_cfg');
-      if (savedCfg) {
-        STATE.github = JSON.parse(savedCfg);
-        el.ghPatInput.value = STATE.github.pat || '';
-        el.ghOwnerInput.value = STATE.github.owner || '';
-        el.ghRepoInput.value = STATE.github.repo || '';
-      }
-    }
+        // ------------------------------------------------------------------
+        // DATA SYNC & STORAGE & SIMULATION
+        // ------------------------------------------------------------------
+        function saveAndSyncData() {
+            localStorage.setItem('fleet_vehicles', JSON.stringify(state.vehicles));
+            localStorage.setItem('fleet_history', JSON.stringify(state.historyLogs));
+            renderVehicleLists();
+            updateMapMarkers();
+            updateJsonViews();
+            syncWithGitHubAPI();
+        }
 
-    // --- HELPER UTILS ---
-    function showToast(msg, isError = false) {
-      el.toastMessage.textContent = msg;
-      el.toast.classList.remove('translate-y-[-100%]', 'opacity-0');
-      if (isError) {
-        document.getElementById('toastIcon').textContent = 'error';
-        document.getElementById('toastIcon').className = 'material-symbols-outlined text-sm text-google-red';
-      } else {
-        document.getElementById('toastIcon').textContent = 'check_circle';
-        document.getElementById('toastIcon').className = 'material-symbols-outlined text-sm text-google-green';
-      }
-      setTimeout(() => {
-        el.toast.classList.add('translate-y-[-100%]', 'opacity-0');
-      }, 3000);
-    }
+        function renderVehicleLists() {
+            // Render Map Side Drawer List
+            const listContainer = document.getElementById('vehicleList');
+            listContainer.innerHTML = '';
+            
+            const vehiclesArr = Object.values(state.vehicles);
+            document.getElementById('vehicleCountBadge').innerText = `${vehiclesArr.length}台`;
 
-    function downloadFile(filename, text, mimeType) {
-      const blob = new Blob([text], { type: mimeType });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }
-  </script>
+            vehiclesArr.forEach(v => {
+                const item = document.createElement('div');
+                item.className = "p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700 hover:border-brand-500 cursor-pointer transition-all";
+                item.onclick = () => focusOnVehicle(v.id);
+                item.innerHTML = `
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="font-bold text-xs flex items-center gap-1.5">
+                            <span class="w-3 h-3 rounded-full" style="background-color: ${v.color}"></span>
+                            ${v.name}
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${v.online ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' : 'bg-slate-200 text-slate-600'}">
+                            ${v.online ? '稼働中' : '停止中'}
+                        </span>
+                    </div>
+                    <div class="text-[11px] text-slate-500 dark:text-slate-400 flex justify-between">
+                        <span>速度: ${v.speed.toFixed(1)} km/h</span>
+                        <span>方角: ${Math.round(v.heading)}° (${getCardinalDirection(v.heading)})</span>
+                    </div>
+                `;
+                listContainer.appendChild(item);
+            });
+
+            // Render Admin Table
+            const adminBody = document.getElementById('adminVehicleTableBody');
+            if (adminBody) {
+                adminBody.innerHTML = '';
+                document.getElementById('adminVehicleCount').innerText = vehiclesArr.length;
+
+                vehiclesArr.forEach(v => {
+                    const row = document.createElement('tr');
+                    row.className = "hover:bg-slate-50 dark:hover:bg-slate-700/30";
+                    row.innerHTML = `
+                        <td class="p-3">
+                            <span class="w-5 h-5 rounded-full inline-block align-middle border border-slate-300" style="background-color: ${v.color}"></span>
+                        </td>
+                        <td class="p-3 font-mono font-bold">${v.id}</td>
+                        <td class="p-3 font-bold">${v.name}</td>
+                        <td class="p-3">
+                            <button onclick="toggleVehicleOnlineStatus('${v.id}')" class="px-2.5 py-1 rounded-full text-[10px] font-bold ${v.online ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}">
+                                ${v.online ? 'オンライン' : 'オフライン'}
+                            </button>
+                        </td>
+                        <td class="p-3 text-slate-500 font-mono text-[11px]">${new Date(v.lastUpdated).toLocaleTimeString()}</td>
+                        <td class="p-3 text-right space-x-1">
+                            <button onclick="openVehicleModal('${v.id}')" class="p-1 text-brand-600 hover:bg-brand-50 rounded"><span class="material-symbols-outlined text-base">edit</span></button>
+                            <button onclick="deleteVehicle('${v.id}')" class="p-1 text-rose-600 hover:bg-rose-50 rounded"><span class="material-symbols-outlined text-base">delete</span></button>
+                        </td>
+                    `;
+                    adminBody.appendChild(row);
+                });
+            }
+        }
+
+        function populateVehicleSelects() {
+            const select = document.getElementById('driverVehicleSelect');
+            select.innerHTML = '';
+            Object.values(state.vehicles).forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v.id;
+                opt.innerText = `${v.name} (${v.id})`;
+                select.appendChild(opt);
+            });
+        }
+
+        function updateJsonViews() {
+            const currentObj = { vehicles: state.vehicles };
+            const historyObj = { logs: state.historyLogs.slice(-50) };
+
+            const cElem = document.getElementById('jsonCurrent');
+            const hElem = document.getElementById('jsonHistory');
+
+            if (cElem) cElem.value = JSON.stringify(currentObj, null, 2);
+            if (hElem) hElem.value = JSON.stringify(historyObj, null, 2);
+        }
+
+        function startSimulatedUpdates() {
+            // Background simulator moving non-active driver vehicles for demo purposes
+            setInterval(() => {
+                if (state.playbackActive) return;
+
+                Object.keys(state.vehicles).forEach(id => {
+                    if (id !== state.activeDriverVehicleId && state.vehicles[id].online) {
+                        const v = state.vehicles[id];
+                        const dLat = (Math.random() - 0.5) * 0.001;
+                        const dLng = (Math.random() - 0.5) * 0.001;
+                        v.lat += dLat;
+                        v.lng += dLng;
+                        v.speed = Math.floor(Math.random() * 45) + 10;
+                        v.heading = (v.heading + (Math.random() * 20 - 10) + 360) % 360;
+                        v.lastUpdated = new Date().toISOString();
+                    }
+                });
+
+                renderVehicleLists();
+                updateMapMarkers();
+                updateJsonViews();
+            }, 3000);
+        }
+
+        // ------------------------------------------------------------------
+        // TIMELINE PLAYBACK SCRUBBER
+        // ------------------------------------------------------------------
+        function togglePlayback() {
+            state.playbackActive = !state.playbackActive;
+            const btn = document.getElementById('playbackPlayBtn');
+
+            if (state.playbackActive) {
+                btn.innerHTML = `<span class="material-symbols-outlined text-xl">pause</span>`;
+                if (state.historyLogs.length === 0) {
+                    showToast("再生可能な歴史データがありません", "warning");
+                    togglePlayback();
+                    return;
+                }
+                runPlaybackLoop();
+            } else {
+                btn.innerHTML = `<span class="material-symbols-outlined text-xl">play_arrow</span>`;
+                clearTimeout(state.playbackTimer);
+            }
+        }
+
+        function runPlaybackLoop() {
+            if (!state.playbackActive) return;
+
+            const slider = document.getElementById('timelineSlider');
+            let idx = parseInt(slider.value);
+            idx++;
+
+            if (idx >= 100) idx = 0;
+            slider.value = idx;
+            onSliderChange(idx);
+
+            state.playbackTimer = setTimeout(runPlaybackLoop, 1000 / state.playbackSpeed);
+        }
+
+        function onSliderChange(val) {
+            const label = document.getElementById('playbackTimeLabel');
+            if (val == 100) {
+                label.innerText = "リアルタイム表示中";
+                return;
+            }
+
+            if (state.historyLogs.length === 0) return;
+
+            const targetIdx = Math.floor((val / 100) * (state.historyLogs.length - 1));
+            const logItem = state.historyLogs[targetIdx];
+
+            if (logItem) {
+                label.innerText = `タイムライン再生: ${new Date(logItem.timestamp).toLocaleTimeString()} (${logItem.vehicleId})`;
+                if (mapMarkers[logItem.vehicleId]) {
+                    mapMarkers[logItem.vehicleId].setLatLng([logItem.lat, logItem.lng]);
+                }
+            }
+        }
+
+        function setPlaybackSpeed(spd) {
+            state.playbackSpeed = spd;
+            document.querySelectorAll('#spd-1, #spd-4').forEach(b => b.classList.remove('bg-brand-600', 'text-white'));
+            document.getElementById(`spd-${spd}`).classList.add('bg-brand-600', 'text-white');
+        }
+
+        function resetToRealtime() {
+            state.playbackActive = false;
+            document.getElementById('timelineSlider').value = 100;
+            document.getElementById('playbackTimeLabel').innerText = "リアルタイム表示中";
+            document.getElementById('playbackPlayBtn').innerHTML = `<span class="material-symbols-outlined text-xl">play_arrow</span>`;
+            updateMapMarkers();
+        }
+
+        // ------------------------------------------------------------------
+        // GITHUB API REAL INTEGRATION / SYNC
+        // ------------------------------------------------------------------
+        async function syncWithGitHubAPI() {
+            const { owner, repo, token } = state.githubConfig;
+            if (!owner || !repo || !token) return; // Fallback to Local/Demo mode
+
+            document.getElementById('syncText').innerText = "GitHub同期中...";
+
+            try {
+                // Update current.json on Repository
+                const path = "data/current.json";
+                const content = btoa(unescape(encodeURIComponent(JSON.stringify({ vehicles: state.vehicles }, null, 2))));
+
+                // 1. Get SHA of file if exists
+                const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+
+                let sha = "";
+                if (getRes.ok) {
+                    const data = await getRes.json();
+                    sha = data.sha;
+                }
+
+                // 2. Put Update
+                await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: `Update vehicle location telemetry [${new Date().toISOString()}]`,
+                        content: content,
+                        sha: sha || undefined
+                    })
+                });
+
+                document.getElementById('syncText').innerText = "GitHub同期完了";
+            } catch (err) {
+                console.error("GitHub Sync Error:", err);
+                document.getElementById('syncText').innerText = "同期エラー(ローカル保存)";
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // NAVIGATION & UI HELPERS
+        // ------------------------------------------------------------------
+        function switchView(viewName) {
+            state.currentView = viewName;
+
+            // Hide all view sections
+            ['map', 'driver', 'admin'].forEach(v => {
+                document.getElementById(`view-${v}`).classList.add('hidden');
+            });
+
+            // Show selected view section
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+
+            // Refresh Map geometry on tab switch to avoid Leaflet rendering artifacts
+            if (viewName === 'map' && map) {
+                setTimeout(() => map.invalidateSize(), 200);
+            }
+
+            // Highlight Active Desktop Tabs
+            document.querySelectorAll('#desktopNav button').forEach(b => {
+                b.className = "px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors text-slate-600 dark:text-slate-300 hover:text-slate-900";
+            });
+            const activeTab = document.getElementById(`tab-${viewName}`);
+            if (activeTab) {
+                activeTab.className = "px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors bg-white dark:bg-slate-800 text-brand-600 dark:text-brand-500 shadow-sm font-bold";
+            }
+
+            // Highlight Active Mobile Bottom Nav Tabs
+            document.querySelectorAll('nav button').forEach(b => {
+                b.className = "flex flex-col items-center gap-1 text-slate-500 dark:text-slate-400 text-xs";
+            });
+            const activeMobTab = document.getElementById(`mob-tab-${viewName}`);
+            if (activeMobTab) {
+                activeMobTab.className = "flex flex-col items-center gap-1 text-brand-600 dark:text-brand-500 font-bold text-xs";
+            }
+        }
+
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                document.getElementById('themeIcon').innerText = 'dark_mode';
+                localStorage.setItem('fleet_theme', 'light');
+            } else {
+                html.classList.add('dark');
+                document.getElementById('themeIcon').innerText = 'light_mode';
+                localStorage.setItem('fleet_theme', 'dark');
+            }
+        }
+
+        function initTheme() {
+            if (state.theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                document.getElementById('themeIcon').innerText = 'light_mode';
+            }
+        }
+
+        // Config Modal Functions
+        function openConfigModal() {
+            document.getElementById('cfgOwner').value = state.githubConfig.owner || '';
+            document.getElementById('cfgRepo').value = state.githubConfig.repo || '';
+            document.getElementById('cfgToken').value = state.githubConfig.token || '';
+            document.getElementById('configModal').classList.remove('hidden');
+        }
+        function closeConfigModal() {
+            document.getElementById('configModal').classList.add('hidden');
+        }
+        function saveConfigModal() {
+            state.githubConfig = {
+                owner: document.getElementById('cfgOwner').value.trim(),
+                repo: document.getElementById('cfgRepo').value.trim(),
+                token: document.getElementById('cfgToken').value.trim()
+            };
+            localStorage.setItem('fleet_gh_config', JSON.stringify(state.githubConfig));
+            closeConfigModal();
+            showToast("GitHub連携設定を保存しました", "success");
+        }
+
+        // Toast Messages
+        function showToast(msg, type = "info") {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            document.getElementById('toastMsg').innerText = msg;
+
+            if (type === 'success') icon.innerText = 'check_circle';
+            else if (type === 'warning') icon.innerText = 'warning';
+            else icon.innerText = 'info';
+
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 3000);
+        }
+
+        function copyToClipboard(elemId) {
+            const text = document.getElementById(elemId).value;
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            showToast("クリップボードにコピーしました", "success");
+        }
+
+        // Helper Math Functions for GPS Telemetry
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // meters
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        function calculateBearing(lat1, lon1, lat2, lon2) {
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const y = Math.sin(Δλ) * Math.cos(φ2);
+            const x = Math.cos(φ1) * Math.sin(φ2) -
+                      Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+            const θ = Math.atan2(y, x);
+            return (θ * 180 / Math.PI + 360) % 360;
+        }
+
+        function getCardinalDirection(angle) {
+            const directions = ['北', '北東', '東', '南東', '南', '南西', '西', '北西'];
+            return directions[Math.round(angle / 45) % 8];
+        }
+    </script>
 </body>
 </html>
