@@ -788,9 +788,8 @@ window.onload = async function() {
                 };
 
                 state.historyLogs.push(logItem);
-                
-                // Add to GAS history sheet directly
-                addHistoryLogToGAS(logItem);
+                // GAS performs current update + history append atomically under one lock.
+                sendPositionToGAS(logItem, vId);
             }
 
             document.getElementById('liveSpeed').innerText = calcSpeed.toFixed(1);
@@ -799,7 +798,7 @@ window.onload = async function() {
             document.getElementById('liveCoords').innerText = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
             document.getElementById('liveLastUpdate').innerText = now.toLocaleTimeString();
 
-            saveAndSyncData();
+            refreshLocalUI();
         }
 
         function handleGpsError(err) {
@@ -874,51 +873,38 @@ window.onload = async function() {
             document.getElementById('vehicleModal').classList.add('hidden');
         }
 
-        function saveVehicleModal() {
+        async function saveVehicleModal() {
             const vId = document.getElementById('modalVehicleId').value.trim();
             const name = document.getElementById('modalVehicleName').value.trim();
             const driverName = document.getElementById('modalDriverName').value.trim();
             const color = document.getElementById('modalVehicleColor').value;
+            if (!vId || !name) { showToast('車両IDと名前を入力してください', 'warning'); return; }
 
-            if (!vId || !name) {
-                showToast("車両IDと名前を入力してください", "warning");
-                return;
-            }
+            let v = editingVehicleId && state.vehicles[editingVehicleId]
+                ? { ...state.vehicles[editingVehicleId], name, driverName, color }
+                : { id:vId, name, driverName, color, lat:35.1709, lng:136.8815, speed:0, heading:0, online:false, lastUpdated:null };
+            if (editingVehicleId) v.id = editingVehicleId;
 
-            if (editingVehicleId) {
-                state.vehicles[editingVehicleId].name = name;
-                state.vehicles[editingVehicleId].driverName = driverName;
-                state.vehicles[editingVehicleId].color = color;
-            } else {
-                state.vehicles[vId] = {
-                    id: vId,
-                    name: name,
-                    driverName: driverName,
-                    color: color,
-                    lat: 35.1709 + (Math.random() - 0.5) * 0.03,
-                    lng: 136.8815 + (Math.random() - 0.5) * 0.03,
-                    speed: 0,
-                    heading: 0,
-                    online: true,
-                    lastUpdated: new Date().toISOString()
-                };
-            }
-
-            closeVehicleModal();
-            saveAndSyncData();
-            showToast("車両を追加・保存し、GASに同期中です", "success");
+            if (!state.gasUrl) { state.vehicles[v.id] = v; refreshLocalUI(); closeVehicleModal(); showToast('デモデータとして保存しました','success'); return; }
+            const ok = await saveVehicleToGAS(v);
+            if (ok) {
+                await fetchVehiclesFromGAS();
+                closeVehicleModal();
+                showToast('車両情報を保存しました', 'success');
+            } else showToast('車両情報の保存に失敗しました', 'warning');
         }
 
-        function deleteVehicle(id) {
-            if (confirm(`車両 ${id} を削除しますか？`)) {
-                delete state.vehicles[id];
-                if (mapMarkers[id]) {
-                    map.removeLayer(mapMarkers[id]);
-                    delete mapMarkers[id];
-                }
-                saveAndSyncData();
-                showToast("車両を削除しました", "info");
+        async function deleteVehicle(id) {
+            if (!confirm(`車両 ${id} を削除しますか？`)) return;
+            if (!state.gasUrl) {
+                delete state.vehicles[id]; refreshLocalUI(); showToast('デモデータから削除しました','info'); return;
             }
+            if (await deleteVehicleFromGAS(id)) {
+                delete state.vehicles[id];
+                if (mapMarkers[id]) { map.removeLayer(mapMarkers[id]); delete mapMarkers[id]; }
+                await fetchVehiclesFromGAS();
+                showToast('車両を削除しました','info');
+            } else showToast('車両の削除に失敗しました','warning');
         }
 
         function seedSampleVehicles() {
@@ -926,7 +912,8 @@ window.onload = async function() {
                 "CAR-001": { id: "CAR-001", name: "1号車 (名古屋営業)", color: "#6366f1", lat: 35.1709, lng: 136.8815, speed: 32.5, heading: 90, online: true, lastUpdated: new Date().toISOString() },
                 "CAR-002": { id: "CAR-002", name: "2号車 (配送トラック)", color: "#ec4899", lat: 35.1549, lng: 136.9639, speed: 0, heading: 180, online: true, lastUpdated: new Date().toISOString() }
             };
-            saveAndSyncData();
+            refreshLocalUI();
+            if (state.gasUrl) Promise.all(Object.values(state.vehicles).map(saveVehicleToGAS)).then(fetchVehiclesFromGAS);
             autoFitMapBounds();
             showToast("サンプル車両データ（2台）を投入しました", "success");
         }
@@ -935,18 +922,18 @@ window.onload = async function() {
             if (confirm("本当にすべての車両データと履歴を消去しますか？")) {
                 state.vehicles = {};
                 state.historyLogs = [];
-                saveAndSyncData();
+                refreshLocalUI();
                 clearHistoryLogOnGAS();
                 autoFitMapBounds();
                 showToast("全車両データをクリアしました", "info");
             }
         }
 
-        function toggleVehicleOnlineStatus(id) {
-            if (state.vehicles[id]) {
-                state.vehicles[id].online = !state.vehicles[id].online;
-                saveAndSyncData();
-            }
+        async function toggleVehicleOnlineStatus(id) {
+            if (!state.vehicles[id]) return;
+            const next = !state.vehicles[id].online;
+            if (!state.gasUrl) { state.vehicles[id].online = next; refreshLocalUI(); return; }
+            if (await setVehicleOnlineOnGAS(id, next)) { state.vehicles[id].online = next; refreshLocalUI(); }
         }
 
         function exportCSV(vehicleId = null) {
@@ -1053,154 +1040,158 @@ window.onload = async function() {
         // ------------------------------------------------------------------
         // GAS API SYNC & SPREADSHEET READ/WRITE
         // ------------------------------------------------------------------
-        
-        // 1. Fetch current vehicles list from 'current' sheet (GET)
+        async function gasRequest(action, payload = {}, method = 'GET') {
+            if (!state.gasUrl) throw new Error('GAS URLが設定されていません');
+            let url = state.gasUrl;
+            const opts = { method, cache: 'no-store' };
+            if (method === 'GET') {
+                const q = new URLSearchParams({ action, ...payload });
+                url += (url.includes('?') ? '&' : '?') + q.toString();
+            } else {
+                opts.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
+                opts.body = JSON.stringify({ action, ...payload });
+            }
+            const res = await fetch(url, opts);
+            if (!res.ok) throw new Error(`GAS HTTP ${res.status}`);
+            const data = await res.json();
+            if (data && data.ok === false) throw new Error(data.error || 'GAS error');
+            state.lastNetworkCommunication = new Date();
+            state.isCurrentlyOffline = false;
+            updateSyncBadgeStatus('synced');
+            return data;
+        }
+
+        // 一時的な空レスポンスで、既存の登録車両を「0台」にしないための保護。
+        let lastGoodVehicleSnapshot = null;
+        let consecutiveEmptyVehicleReads = 0;
+
         async function fetchVehiclesFromGAS() {
             if (!state.gasUrl) {
-                updateSyncBadgeStatus("demo");
+                updateSyncBadgeStatus('demo');
                 renderVehicleLists();
                 return;
             }
-
             try {
-                const res = await fetch(`${state.gasUrl}?action=getVehicles`);
+                // 車両一覧のポーリングで history 全件を毎回取得しない。
+                // current だけを取得することで通信量と競合を減らす。
+                const data = await gasRequest('getVehicles');
+                const incoming = (data && data.vehicles && typeof data.vehicles === 'object') ? data.vehicles : {};
+                const incomingIds = Object.keys(incoming);
+                const existingIds = Object.keys(state.vehicles || {});
 
-                if (res.ok) {
-                    const data = await res.json();
-                    
-                    if (data && data.vehicles) {
-                        state.vehicles = data.vehicles;
-                        localStorage.setItem('fleet_vehicles', JSON.stringify(state.vehicles));
-                        populateVehicleSelects();
-                        renderVehicleLists();
-                        updateMapMarkers();
+                // 既に登録車両がある状態で突然空になった場合は、一時障害とみなし保持する。
+                // 連続3回空レスポンスになった場合だけ、サーバー側で本当に0台と判断する。
+                if (incomingIds.length === 0 && existingIds.length > 0) {
+                    consecutiveEmptyVehicleReads++;
+                    console.warn('GAS returned empty vehicle list; retaining last good snapshot:', consecutiveEmptyVehicleReads);
+                    if (lastGoodVehicleSnapshot && consecutiveEmptyVehicleReads < 3) {
+                        state.vehicles = { ...lastGoodVehicleSnapshot };
+                    } else if (consecutiveEmptyVehicleReads >= 3) {
+                        state.vehicles = {};
+                        lastGoodVehicleSnapshot = {};
                     }
-
-                    if (state.isCurrentlyOffline) {
-                        state.isCurrentlyOffline = false;
-                        showToast("GASとの通信が復旧し、同期を再開しました", "success");
-                    }
-
-                    state.lastNetworkCommunication = new Date();
-                    state.isCurrentlyOffline = false;
-                    updateSyncBadgeStatus("synced");
                 } else {
-                    handleSyncOfflineState();
+                    consecutiveEmptyVehicleReads = 0;
+                    state.vehicles = incoming;
+                    lastGoodVehicleSnapshot = { ...incoming };
                 }
+
+                populateVehicleSelects();
+                renderVehicleLists();
+                updateMapMarkers();
+                if (!state.playbackActive) autoFitMapBounds();
             } catch (err) {
-                console.error("GAS Fetch Vehicles Error:", err);
+                // 通信失敗時は current を空にせず、最後に取得できた車両一覧を維持する。
+                console.error('GAS vehicle error:', err);
+                if (lastGoodVehicleSnapshot && Object.keys(lastGoodVehicleSnapshot).length) {
+                    state.vehicles = { ...lastGoodVehicleSnapshot };
+                    refreshLocalUI();
+                }
                 handleSyncOfflineState();
             }
         }
 
-        // 2. Fetch history telemetry logs from 'history' sheet (GET)
         async function fetchHistoryFromGAS() {
             if (!state.gasUrl) return;
-
             try {
-                const res = await fetch(`${state.gasUrl}?action=getHistory`);
-
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.history) {
-                        state.historyLogs = data.history;
-                        localStorage.setItem('fleet_history', JSON.stringify(state.historyLogs));
-                    }
-                }
+                const data = await gasRequest('getHistory', { date: state.selectedDate });
+                state.historyLogs = Array.isArray(data.history) ? data.history : [];
+                // ここでは vehicles を絶対に上書きしない。
+                // 履歴取得の一時的な空レスポンスで current の登録車両を消さないため。
+                updateMapMarkers();
             } catch (err) {
-                console.error("GAS Fetch History Error:", err);
-            }
-        }
-
-        // 3. Sync current vehicles state to 'current' sheet (POST)
-        async function syncWithGAS() {
-            if (!state.gasUrl) return;
-
-            try {
-                const res = await fetch(state.gasUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({
-                        action: 'updateVehicles',
-                        vehicles: state.vehicles
-                    })
-                });
-
-                if (res.ok) {
-                    state.lastNetworkCommunication = new Date();
-                    state.isCurrentlyOffline = false;
-                    updateSyncBadgeStatus("synced");
-                } else {
-                    handleSyncOfflineState();
-                }
-            } catch (err) {
-                console.error("GAS Sync Exception:", err);
+                console.error('GAS history error:', err);
                 handleSyncOfflineState();
             }
         }
 
-        // 4. Append telemetry log row to 'history' sheet (POST)
-        async function addHistoryLogToGAS(logItem) {
+        async function sendPositionToGAS(logItem, vehicleId) {
             if (!state.gasUrl) return;
             try {
-                await fetch(state.gasUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({
-                        action: 'addHistory',
-                        log: logItem
-                    })
-                });
+                await gasRequest('updatePosition', { vehicleId, log: logItem }, 'POST');
             } catch (err) {
-                console.error("History Log Error:", err);
+                console.error('GAS position error:', err);
+                handleSyncOfflineState();
             }
         }
 
-        // 5. Clear history sheet on GAS (POST)
+        async function saveVehicleToGAS(vehicle) {
+            if (!state.gasUrl) return false;
+            try {
+                await gasRequest('saveVehicle', { vehicle }, 'POST');
+                return true;
+            } catch (err) {
+                console.error('GAS vehicle save error:', err);
+                handleSyncOfflineState();
+                return false;
+            }
+        }
+
+        async function deleteVehicleFromGAS(id) {
+            if (!state.gasUrl) return false;
+            try {
+                await gasRequest('deleteVehicle', { id }, 'POST');
+                return true;
+            } catch (err) {
+                console.error('GAS vehicle delete error:', err);
+                handleSyncOfflineState();
+                return false;
+            }
+        }
+
         async function clearHistoryLogOnGAS() {
             if (!state.gasUrl) return;
-            try {
-                await fetch(state.gasUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: 'clearHistory' })
-                });
-            } catch (err) {
-                console.error("Clear History Error:", err);
-            }
+            try { await gasRequest('clearHistory', {}, 'POST'); }
+            catch (err) { console.error('Clear History Error:', err); handleSyncOfflineState(); }
         }
 
-        
-        function evaluateSyncHealth() {
-            if (!state.gasUrl) {
-                updateSyncBadgeStatus("demo");
-                return;
-            }
-            if (!state.lastNetworkCommunication ||
-                (Date.now() - state.lastNetworkCommunication.getTime()) >= 5 * 60 * 1000) {
-                state.isCurrentlyOffline = true;
-                updateSyncBadgeStatus("offline");
-            } else {
-                state.isCurrentlyOffline = false;
-                updateSyncBadgeStatus("synced");
-            }
+        async function setVehicleOnlineOnGAS(id, online) {
+            if (!state.gasUrl) return false;
+            try { await gasRequest('setVehicleOnline', { id, online }, 'POST'); return true; }
+            catch (err) { console.error('GAS online status error:', err); handleSyncOfflineState(); return false; }
         }
 
-function handleSyncOfflineState() {
-            if (!state.isCurrentlyOffline) {
-                state.isCurrentlyOffline = true;
-                showToast("GASとの接続が切れました。オフラインモードで動作します", "warning");
-            }
-            updateSyncBadgeStatus("offline");
-        }
-
-        // Periodic polling. GAS/Spreadsheet synchronization is not true push; polling interval affects latency.
         function startFastPolling() {
+            // GAS is polled instead of overwritten wholesale by clients. This avoids stale-client
+            // writes that used to make vehicles disappear on another device.
             setInterval(() => {
-                if (!state.playbackActive) {
-                    fetchVehiclesFromGAS();
-                }
+                if (state.gasUrl && !state.isTracking) fetchVehiclesFromGAS();
+                evaluateSyncHealth();
             }, 10000);
+        }
+
+        function evaluateSyncHealth() {
+            if (!state.gasUrl) { updateSyncBadgeStatus('demo'); return; }
+            if (!state.lastNetworkCommunication || (Date.now() - state.lastNetworkCommunication.getTime()) > 5 * 60 * 1000) {
+                state.isCurrentlyOffline = true;
+                updateSyncBadgeStatus('offline');
+            } else {
+                updateSyncBadgeStatus('synced');
+            }
+        }
+
+        function handleSyncOfflineState() {
+            evaluateSyncHealth();
         }
 
         function updateSyncBadgeStatus(status) {
@@ -1208,34 +1199,26 @@ function handleSyncOfflineState() {
             const dot = document.getElementById('syncDot');
             const text = document.getElementById('syncText');
             if (!badge || !dot || !text) return;
-
-            badge.className = "flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-bold border";
-
-            if (status === "synced") {
-                badge.classList.add("bg-emerald-50","text-emerald-700","border-emerald-200","dark:bg-emerald-950","dark:text-emerald-300","dark:border-emerald-800");
-                dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500";
-                text.innerText = "同期中";
-            } else if (status === "offline") {
-                badge.classList.add("bg-amber-50","text-amber-800","border-amber-200","dark:bg-amber-950","dark:text-amber-300","dark:border-amber-800");
-                dot.className = "w-2.5 h-2.5 rounded-full bg-amber-500";
-                text.innerText = "オフライン";
+            badge.className = 'flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-bold border';
+            if (status === 'synced') {
+                badge.classList.add('bg-emerald-50','text-emerald-700','border-emerald-200','dark:bg-emerald-950','dark:text-emerald-300','dark:border-emerald-900');
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500'; text.innerText = '同期中';
+            } else if (status === 'offline') {
+                badge.classList.add('bg-amber-50','text-amber-700','border-amber-200','dark:bg-amber-950','dark:text-amber-300','dark:border-amber-900');
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-amber-500'; text.innerText = 'オフライン';
             } else {
-                badge.classList.add("bg-slate-100","text-slate-600","border-slate-200","dark:bg-slate-800","dark:text-slate-300","dark:border-slate-700");
-                dot.className = "w-2.5 h-2.5 rounded-full bg-slate-400";
-                text.innerText = "デモ";
+                badge.classList.add('bg-slate-200','text-slate-700','border-slate-300','dark:bg-slate-800','dark:text-slate-300','dark:border-slate-700');
+                dot.className = 'w-2.5 h-2.5 rounded-full bg-slate-400'; text.innerText = 'デモ';
             }
         }
 
         // ------------------------------------------------------------------
         // UI & RENDER HELPERS
         // ------------------------------------------------------------------
-        function saveAndSyncData() {
-            localStorage.setItem('fleet_vehicles', JSON.stringify(state.vehicles));
-            localStorage.setItem('fleet_history', JSON.stringify(state.historyLogs));
+        function refreshLocalUI() {
             populateVehicleSelects();
             renderVehicleLists();
             updateMapMarkers();
-            syncWithGAS();
         }
 
         function renderVehicleLists() {
