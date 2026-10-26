@@ -1,3 +1,15 @@
 {
-  "vehicles": {}
+  "vehicles": {
+    "CAR-001": {
+      "id": "CAR-001",
+      "name": "ハイエースA",
+      "color": "#4f46e5",
+      "lat": 35.16623715504718,
+      "lng": 136.88333465749,
+      "speed": 0,
+      "heading": 0,
+      "online": true,
+      "lastUpdated": "2026-10-26T12:36:20.952Z"
+    }
+  }
 }
