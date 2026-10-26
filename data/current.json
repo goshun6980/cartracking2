@@ -1,0 +1,14 @@
+{
+  "vehicles": {
+    "CAR-001": {
+      "id": "CAR-001",
+      "name": "1号車",
+      "lat": 35.1549,
+      "lng": 136.9639,
+      "speed": 0,
+      "heading": 0,
+      "online": false,
+      "lastUpdated": "2026-10-26T00:00:00Z"
+    }
+  }
+}
