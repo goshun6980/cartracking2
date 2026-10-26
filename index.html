@@ -95,7 +95,7 @@
             <span class="material-symbols-outlined text-brand-600 dark:text-brand-400 text-2xl md:text-3xl">directions_car</span>
             <div>
                 <h1 class="text-base md:text-lg font-bold leading-tight">運行状況</h1>
-                <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">OpenStreetMap & GitHub API リアルタイム連携</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Google Apps Script (GAS) & OSM 高速リアルタイム連携</p>
             </div>
         </div>
 
@@ -120,7 +120,7 @@
             </div>
 
             <!-- Config Gear Icon -->
-            <button onclick="openConfigModal()" class="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="設定 (GitHub API)">
+            <button onclick="openConfigModal()" class="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="設定 (GAS API)">
                 <span class="material-symbols-outlined">settings</span>
             </button>
 
@@ -159,12 +159,11 @@
                     </div>
                 </div>
 
-                <!-- Timeline Playback Bar (Elevated to avoid covering scale control) -->
+                <!-- Timeline Playback Bar -->
                 <div class="absolute bottom-6 left-3 right-3 md:left-4 md:right-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-3 md:p-4 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-2">
                     
                     <!-- Date & Speed Controls Bar -->
                     <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <!-- Date Navigation Section -->
                         <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
                             <button onclick="changeDate(-1)" class="p-0.5 text-slate-600 dark:text-slate-300 hover:text-brand-600 font-bold">◀</button>
                             <span id="displayDateLabel" class="font-mono font-bold px-1 text-slate-800 dark:text-slate-100">YYYY/MM/DD</span>
@@ -172,7 +171,6 @@
                             <span id="displayTimeLabel" class="font-mono text-brand-600 dark:text-brand-400 font-bold ml-1">00:00:00</span>
                         </div>
 
-                        <!-- Playback Controls -->
                         <div class="flex items-center gap-2">
                             <button id="playbackPlayBtn" onclick="togglePlayback()" class="px-3 py-1 rounded-lg bg-brand-600 text-white flex items-center gap-1 hover:bg-brand-700 shadow transition-transform active:scale-95 font-bold">
                                 <span class="material-symbols-outlined text-base">play_arrow</span> 再生
@@ -197,7 +195,7 @@
                 </div>
             </div>
 
-            <!-- Vehicles Side Drawer / Collapsible Storage Bar -->
+            <!-- Vehicles Side Drawer -->
             <div id="vehicleDrawer" class="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col h-40 md:h-full z-10 shadow-lg transition-all duration-300">
                 <div class="p-3 border-b border-slate-200 dark:border-slate-800 font-bold text-xs flex items-center justify-between shrink-0">
                     <span class="flex items-center gap-1.5 text-slate-800 dark:text-slate-100">
@@ -234,7 +232,7 @@
                     <div>
                         <div class="flex justify-between items-center mb-1">
                             <label class="block text-xs font-bold text-slate-600 dark:text-slate-300">担当車両を選択</label>
-                            <button onclick="fetchVehiclesFromGitHub()" class="text-[11px] text-brand-600 dark:text-brand-400 font-bold flex items-center gap-1 hover:underline">
+                            <button onclick="fetchVehiclesFromGAS()" class="text-[11px] text-brand-600 dark:text-brand-400 font-bold flex items-center gap-1 hover:underline">
                                 <span class="material-symbols-outlined text-sm">refresh</span> リスト更新
                             </button>
                         </div>
@@ -288,7 +286,6 @@
         <!-- 3. ADMIN DASHBOARD VIEW -->
         <section id="view-admin" class="hidden w-full h-full overflow-y-auto p-4 md:p-8 max-w-5xl mx-auto space-y-6">
 
-            <!-- Mobile Desktop-Only Warning Banner -->
             <div class="md:hidden p-4 bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 rounded-xl border border-amber-300 dark:border-amber-800 text-xs flex items-center gap-2">
                 <span class="material-symbols-outlined text-lg shrink-0">warning</span>
                 <span>管理画面はデスクトップ表示に最適化されています。</span>
@@ -301,7 +298,7 @@
                 </div>
                 <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">管理者認証</h2>
                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                    設定済みの管理者パスワード（初期値: <code class="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded font-bold text-brand-600 dark:text-brand-400">Admin</code>）を入力してください。
+                    管理者パスワード（初期値: <code class="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded font-bold text-brand-600 dark:text-brand-400">Admin</code>）を入力してください。
                 </p>
 
                 <div class="space-y-3">
@@ -314,14 +311,13 @@
 
             <!-- Admin Main Panel -->
             <div id="adminPanel" class="hidden space-y-6">
-                <!-- Header Banner -->
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                     <div>
                         <h2 class="text-lg font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100">
                             <span class="material-symbols-outlined text-brand-600 dark:text-brand-400">admin_panel_settings</span>
                             車両・運行データ管理
                         </h2>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">車両の編集・追加・削除およびデータ同期</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">車両の編集・追加・削除およびGoogleスプレッドシートデータ同期</p>
                     </div>
                     <div class="flex items-center gap-2 flex-wrap">
                         <button onclick="openVehicleModal()" class="px-3.5 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow flex items-center gap-1 transition-transform active:scale-95">
@@ -406,17 +402,17 @@
 
             <div class="flex justify-end gap-2 pt-2">
                 <button onclick="closeVehicleModal()" class="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold">キャンセル</button>
-                <button onclick="saveVehicleModal()" class="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow">保存してGitHub同期</button>
+                <button onclick="saveVehicleModal()" class="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow">保存してGAS同期</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL: GitHub Config & Share Token URL -->
+    <!-- MODAL: GAS Config & Share Token URL -->
     <div id="configModal" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
             <div class="flex justify-between items-center">
                 <h3 class="text-base font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100">
-                    <span class="material-symbols-outlined text-brand-600 dark:text-brand-400">settings</span> GitHub API 連携・共有設定
+                    <span class="material-symbols-outlined text-brand-600 dark:text-brand-400">settings</span> GAS API 連携・設定
                 </h3>
                 <button onclick="closeConfigModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                     <span class="material-symbols-outlined">close</span>
@@ -425,21 +421,14 @@
 
             <div class="space-y-3">
                 <div>
-                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">GitHub Owner (ユーザー名/組織)</label>
-                    <input type="text" id="cfgOwner" placeholder="例: username" oninput="updateShareUrl()" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Repository Name</label>
-                    <input type="text" id="cfgRepo" placeholder="例: fleet-tracker" oninput="updateShareUrl()" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Personal Access Token (PAT)</label>
-                    <input type="password" id="cfgToken" placeholder="ghp_xxxxxxxxxxxx" oninput="updateShareUrl()" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold">
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">Google Apps Script Web App URL</label>
+                    <input type="text" id="cfgGasUrl" placeholder="https://script.google.com/macros/s/AKfycb.../exec" oninput="updateShareUrl()" class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-mono font-bold">
+                    <p class="text-[11px] text-slate-400 mt-1">※GASでデモ公開（全員アクセス可）したウェブアプリのURLを入力してください。</p>
                 </div>
 
-                <!-- Generated URL with Token Embedded -->
+                <!-- Generated URL with GAS URL Embedded -->
                 <div class="pt-2 border-t border-slate-200 dark:border-slate-800">
-                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">設定反映用 トークン埋め込みURL</label>
+                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">設定共有用 URL (他端末への展開用)</label>
                     <div class="flex gap-2">
                         <input type="text" id="cfgShareUrl" readonly class="flex-1 p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-950 text-slate-600 dark:text-slate-400 text-xs font-mono">
                         <button onclick="copyShareUrl()" class="px-3 py-2 bg-brand-600 text-white rounded-xl text-xs font-bold shadow hover:bg-brand-700 shrink-0">
@@ -471,7 +460,7 @@
             adminAuthenticated: false,
             currentView: 'map',
             theme: localStorage.getItem('fleet_theme') || 'system',
-            githubConfig: JSON.parse(localStorage.getItem('fleet_gh_config') || '{"owner":"","repo":"","token":""}'),
+            gasUrl: localStorage.getItem('fleet_gas_url') || '',
             
             // Clean initial state (No dummy ghost vehicles)
             vehicles: JSON.parse(localStorage.getItem('fleet_vehicles') || '{}'),
@@ -511,23 +500,18 @@
             initTheme();
             initLeafletMap();
             initOsmTimer();
-            fetchVehiclesFromGitHub(); // Fetch real data from GitHub immediately
-            startBackgroundPolling();
+            fetchVehiclesFromGAS(); // Fast fetch via GAS
+            startFastPolling();
             updateDisplayDateLabel();
         };
 
-        // Parse token/config embedded in URL query parameters
+        // Parse GAS URL embedded in URL query parameters
         function parseUrlParameters() {
             const params = new URLSearchParams(window.location.search);
-            let updated = false;
-
-            if (params.has('token')) { state.githubConfig.token = params.get('token'); updated = true; }
-            if (params.has('owner')) { state.githubConfig.owner = params.get('owner'); updated = true; }
-            if (params.has('repo'))  { state.githubConfig.repo  = params.get('repo');  updated = true; }
-
-            if (updated) {
-                localStorage.setItem('fleet_gh_config', JSON.stringify(state.githubConfig));
-                showToast("URLからGitHub接続情報を読み込みました", "success");
+            if (params.has('gasUrl')) {
+                state.gasUrl = params.get('gasUrl');
+                localStorage.setItem('fleet_gas_url', state.gasUrl);
+                showToast("URLからGAS接続情報を読み込みました", "success");
             }
         }
 
@@ -540,18 +524,15 @@
                 attributionControl: false
             }).setView([35.1709, 136.8815], 13);
 
-            // OpenStreetMap Standard Tiles
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19
             }).addTo(map);
 
-            // Add Scale Control (Visible at bottom-left)
             L.control.scale({ imperial: false, metric: true, position: 'bottomleft' }).addTo(map);
 
             autoFitMapBounds();
         }
 
-        // Automatically position map: Fit all vehicles bounds if exist, otherwise locate user GPS
         function autoFitMapBounds() {
             if (!map) return;
             const vehicleList = Object.values(state.vehicles);
@@ -572,7 +553,6 @@
         function updateMapMarkers() {
             if (!map) return;
 
-            // Remove markers for deleted vehicles
             Object.keys(mapMarkers).forEach(id => {
                 if (!state.vehicles[id]) {
                     map.removeLayer(mapMarkers[id]);
@@ -580,7 +560,6 @@
                 }
             });
 
-            // Create or update markers with exact vehicle color
             Object.values(state.vehicles).forEach(v => {
                 const colorHex = v.color || '#6366f1';
 
@@ -783,38 +762,14 @@
         // ------------------------------------------------------------------
         // ADMIN AUTH & MANAGEMENT
         // ------------------------------------------------------------------
-        async function attemptAdminLogin() {
+        function attemptAdminLogin() {
             const pwdInput = document.getElementById('adminPasswordInput').value;
-            const { owner, repo, token } = state.githubConfig;
 
-            // Default required password is "Admin"
             if (pwdInput === "Admin") {
                 state.adminAuthenticated = true;
                 showAdminPanel();
                 showToast("管理者ログインに成功しました", "success");
                 return;
-            }
-
-            // Attempt verification against GitHub data/config.json if configured
-            if (owner && repo && token) {
-                try {
-                    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data/config.json`, {
-                        headers: { 'Authorization': `token ${token}` }
-                    });
-
-                    if (res.ok) {
-                        const data = await res.json();
-                        const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
-                        if (content.adminPassword === pwdInput) {
-                            state.adminAuthenticated = true;
-                            showAdminPanel();
-                            showToast("管理者ログインに成功しました", "success");
-                            return;
-                        }
-                    }
-                } catch (e) {
-                    console.error(e);
-                }
             }
 
             showToast("パスワードが正しくありません", "warning");
@@ -886,7 +841,7 @@
 
             closeVehicleModal();
             saveAndSyncData();
-            showToast("車両を追加・保存し、GitHubに同期中です", "success");
+            showToast("車両を追加・保存し、GASに同期中です", "success");
         }
 
         function deleteVehicle(id) {
@@ -927,7 +882,6 @@
             }
         }
 
-        // Export CSV in English headers with UTF-8 BOM
         function exportCSV(vehicleId = null) {
             let logs = state.historyLogs;
             if (vehicleId) logs = logs.filter(l => l.id === vehicleId);
@@ -1030,37 +984,34 @@
         }
 
         // ------------------------------------------------------------------
-        // GITHUB API SYNC, POLLING & CONFLICT RETRY
+        // GAS API SYNC & ULTRA FAST POLLING
         // ------------------------------------------------------------------
         
-        // Fetch vehicles data sheet from GitHub (Pull)
-        async function fetchVehiclesFromGitHub() {
-            const { owner, repo, token } = state.githubConfig;
-            if (!owner || !repo || !token) {
+        // Fetch vehicles data from GAS (GET)
+        async function fetchVehiclesFromGAS() {
+            if (!state.gasUrl) {
                 updateSyncBadgeStatus("demo");
                 renderVehicleLists();
                 return;
             }
 
             try {
-                const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/data/current.json`, {
-                    headers: { 'Authorization': `token ${token}` }
-                });
+                const res = await fetch(`${state.gasUrl}?action=getVehicles`);
 
                 if (res.ok) {
                     const data = await res.json();
-                    const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
                     
-                    if (content && content.vehicles) {
-                        state.vehicles = content.vehicles;
+                    if (data && data.vehicles) {
+                        state.vehicles = data.vehicles;
                         localStorage.setItem('fleet_vehicles', JSON.stringify(state.vehicles));
+                        populateVehicleSelects();
                         renderVehicleLists();
                         updateMapMarkers();
                     }
 
                     if (state.isCurrentlyOffline) {
                         state.isCurrentlyOffline = false;
-                        showToast("GitHubとの通信が復旧し、同期を再開しました", "success");
+                        showToast("GASとの通信が復旧し、同期を再開しました", "success");
                     }
 
                     state.lastNetworkCommunication = new Date();
@@ -1069,57 +1020,33 @@
                     handleSyncOfflineState();
                 }
             } catch (err) {
-                console.error("Fetch Error:", err);
+                console.error("GAS Fetch Error:", err);
                 handleSyncOfflineState();
             }
         }
 
-        // Sync vehicles data sheet to GitHub (Push) with Conflict Retry logic
-        async function syncWithGitHubAPI(retries = 3) {
-            const { owner, repo, token } = state.githubConfig;
-            if (!owner || !repo || !token) return;
+        // Sync vehicles data to GAS (POST)
+        async function syncWithGAS() {
+            if (!state.gasUrl) return;
 
             try {
-                const path = "data/current.json";
-                const content = btoa(unescape(encodeURIComponent(JSON.stringify({ vehicles: state.vehicles }, null, 2))));
-
-                // Get current SHA
-                const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-                    headers: { 'Authorization': `token ${token}` }
-                });
-
-                let sha = "";
-                if (getRes.ok) {
-                    const data = await getRes.json();
-                    sha = data.sha;
-                }
-
-                // Put update
-                const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Content-Type': 'application/json'
-                    },
+                const res = await fetch(state.gasUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({
-                        message: `Telemetry Update [${new Date().toISOString()}]`,
-                        content: content,
-                        sha: sha || undefined
+                        action: 'updateVehicles',
+                        vehicles: state.vehicles
                     })
                 });
 
-                if (putRes.ok) {
+                if (res.ok) {
                     state.lastNetworkCommunication = new Date();
                     updateSyncBadgeStatus("synced");
-                } else if (putRes.status === 409 && retries > 0) {
-                    // Retry on SHA conflict
-                    console.warn(`SHA Conflict (409). Retrying... (${retries} left)`);
-                    setTimeout(() => syncWithGitHubAPI(retries - 1), 1000);
                 } else {
                     handleSyncOfflineState();
                 }
             } catch (err) {
-                console.error("Sync Exception:", err);
+                console.error("GAS Sync Exception:", err);
                 handleSyncOfflineState();
             }
         }
@@ -1127,18 +1054,18 @@
         function handleSyncOfflineState() {
             if (!state.isCurrentlyOffline) {
                 state.isCurrentlyOffline = true;
-                showToast("GitHubとの接続が切れました。オフラインモードで動作します", "warning");
+                showToast("GASとの接続が切れました。オフラインモードで動作します", "warning");
             }
             updateSyncBadgeStatus("offline");
         }
 
-        // Automatic background polling every 10 seconds for cross-device sync
-        function startBackgroundPolling() {
+        // High frequency polling (2.5 seconds) for real-time responsiveness
+        function startFastPolling() {
             setInterval(() => {
                 if (!state.playbackActive) {
-                    fetchVehiclesFromGitHub();
+                    fetchVehiclesFromGAS();
                 }
-            }, 10000);
+            }, 2500);
         }
 
         function updateSyncBadgeStatus(status) {
@@ -1170,7 +1097,7 @@
             populateVehicleSelects();
             renderVehicleLists();
             updateMapMarkers();
-            syncWithGitHubAPI();
+            syncWithGAS();
         }
 
         function renderVehicleLists() {
@@ -1281,7 +1208,7 @@
             if (viewName === 'map' && map) {
                 setTimeout(() => map.invalidateSize(), 200);
             } else if (viewName === 'driver') {
-                fetchVehiclesFromGitHub();
+                fetchVehiclesFromGAS();
             }
 
             document.querySelectorAll('#desktopNav button').forEach(b => {
@@ -1338,9 +1265,7 @@
 
         // Config Modal & Shareable URL
         function openConfigModal() {
-            document.getElementById('cfgOwner').value = state.githubConfig.owner || '';
-            document.getElementById('cfgRepo').value = state.githubConfig.repo || '';
-            document.getElementById('cfgToken').value = state.githubConfig.token || '';
+            document.getElementById('cfgGasUrl').value = state.gasUrl || '';
             updateShareUrl();
             document.getElementById('configModal').classList.remove('hidden');
         }
@@ -1350,27 +1275,18 @@
         }
 
         function saveConfigModal() {
-            state.githubConfig = {
-                owner: document.getElementById('cfgOwner').value.trim(),
-                repo: document.getElementById('cfgRepo').value.trim(),
-                token: document.getElementById('cfgToken').value.trim()
-            };
-            localStorage.setItem('fleet_gh_config', JSON.stringify(state.githubConfig));
+            state.gasUrl = document.getElementById('cfgGasUrl').value.trim();
+            localStorage.setItem('fleet_gas_url', state.gasUrl);
             closeConfigModal();
-            fetchVehiclesFromGitHub();
-            showToast("GitHub接続設定を保存しました", "success");
+            fetchVehiclesFromGAS();
+            showToast("GAS接続設定を保存しました", "success");
         }
 
         function updateShareUrl() {
-            const o = document.getElementById('cfgOwner').value.trim();
-            const r = document.getElementById('cfgRepo').value.trim();
-            const t = document.getElementById('cfgToken').value.trim();
-
+            const url = document.getElementById('cfgGasUrl').value.trim();
             const baseUrl = window.location.origin + window.location.pathname;
             const params = new URLSearchParams();
-            if (o) params.set('owner', o);
-            if (r) params.set('repo', r);
-            if (t) params.set('token', t);
+            if (url) params.set('gasUrl', url);
 
             document.getElementById('cfgShareUrl').value = `${baseUrl}?${params.toString()}`;
         }
@@ -1379,7 +1295,7 @@
             const input = document.getElementById('cfgShareUrl');
             input.select();
             document.execCommand('copy');
-            showToast("トークン埋め込みURLをコピーしました", "success");
+            showToast("共有用URLをコピーしました", "success");
         }
 
         function showToast(msg, type = "info") {
