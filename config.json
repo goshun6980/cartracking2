@@ -1,0 +1,19 @@
+{
+  "app": {
+    "name": "運行状況",
+    "theme": "system",
+    "pollingSeconds": 10,
+    "offlineAfterSeconds": 300
+  },
+  "gasUrl": "https://script.google.com/macros/s/AKfycby3CmDyOqieqFXeB_-iF2L3O0f3pzvezF3t3kuuXZKgKV96n605WYTZ4Oi7o8L4ewct/exec",
+  "admin": {
+    "password": "Admin"
+  },
+  "github": {
+    "owner": "",
+    "repository": "",
+    "branch": "main",
+    "configPath": "config.json"
+  },
+  "vehicles": []
+}
