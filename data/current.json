@@ -10,6 +10,17 @@
       "heading": 0,
       "online": true,
       "lastUpdated": "2026-10-26T13:31:59.963Z"
+    },
+    "CAR-001": {
+      "id": "CAR-001",
+      "name": "ハイエースA",
+      "color": "#9fa0d6",
+      "lat": 35.169709876489236,
+      "lng": 136.8875023781407,
+      "speed": 0,
+      "heading": 0,
+      "online": true,
+      "lastUpdated": "2026-10-26T13:33:38.072Z"
     }
   }
 }
