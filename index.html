@@ -891,7 +891,7 @@ window.onload = async function() {
                 await fetchVehiclesFromGAS();
                 closeVehicleModal();
                 showToast('車両情報を保存しました', 'success');
-            } else showToast('車両情報の保存に失敗しました', 'warning');
+            } else showToast('車両情報の保存に失敗しました。GAS接続とデプロイ設定を確認してください', 'warning');
         }
 
         async function deleteVehicle(id) {
@@ -1042,25 +1042,33 @@ window.onload = async function() {
         // ------------------------------------------------------------------
         async function gasRequest(action, payload = {}, method = 'GET') {
             if (!state.gasUrl) throw new Error('GAS URLが設定されていません');
-            let url = state.gasUrl;
-            const opts = { method, cache: 'no-store' };
+            const url = state.gasUrl;
+            const opts = { method, cache: 'no-store', redirect: 'follow' };
             if (method === 'GET') {
                 const q = new URLSearchParams({ action, ...payload });
-                url += (url.includes('?') ? '&' : '?') + q.toString();
-            } else {
-                opts.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
-                opts.body = JSON.stringify({ action, ...payload });
+                const target = url + (url.includes('?') ? '&' : '?') + q.toString();
+                opts.method = 'GET';
+                const res = await fetch(target, opts);
+                const raw = await res.text();
+                if (!res.ok) throw new Error(`GAS HTTP ${res.status}: ${raw.slice(0, 160)}`);
+                let data; try { data = JSON.parse(raw); } catch (_) { throw new Error(`GAS応答がJSONではありません: ${raw.slice(0, 160)}`); }
+                if (data && data.ok === false) throw new Error(data.error || 'GAS error');
+                state.lastNetworkCommunication = new Date(); state.isCurrentlyOffline = false; updateSyncBadgeStatus('synced');
+                return data;
             }
+            opts.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
+            opts.body = JSON.stringify({ action, ...payload });
             const res = await fetch(url, opts);
-            if (!res.ok) throw new Error(`GAS HTTP ${res.status}`);
-            const data = await res.json();
+            const raw = await res.text();
+            if (!res.ok) throw new Error(`GAS HTTP ${res.status}: ${raw.slice(0, 200)}`);
+            let data;
+            try { data = JSON.parse(raw); } catch (_) {
+                throw new Error(`GAS POST応答がJSONではありません: ${raw.slice(0, 200)}`);
+            }
             if (data && data.ok === false) throw new Error(data.error || 'GAS error');
-            state.lastNetworkCommunication = new Date();
-            state.isCurrentlyOffline = false;
-            updateSyncBadgeStatus('synced');
+            state.lastNetworkCommunication = new Date(); state.isCurrentlyOffline = false; updateSyncBadgeStatus('synced');
             return data;
         }
-
         // 一時的な空レスポンスで、既存の登録車両を「0台」にしないための保護。
         let lastGoodVehicleSnapshot = null;
         let consecutiveEmptyVehicleReads = 0;
@@ -1141,7 +1149,18 @@ window.onload = async function() {
                 await gasRequest('saveVehicle', { vehicle }, 'POST');
                 return true;
             } catch (err) {
-                console.error('GAS vehicle save error:', err);
+                // Apps Script のリダイレクト等でPOSTの応答だけ読めない場合でも、
+                // サーバーに実際に保存されたかを GET で確認する。
+                console.error('GAS vehicle save POST error:', err);
+                try {
+                    const check = await gasRequest('getVehicles');
+                    if (check && check.vehicles && check.vehicles[vehicle.id]) {
+                        console.warn('POST response failed, but vehicle was confirmed on GAS:', vehicle.id);
+                        return true;
+                    }
+                } catch (verifyErr) {
+                    console.error('GAS vehicle save verification error:', verifyErr);
+                }
                 handleSyncOfflineState();
                 return false;
             }
