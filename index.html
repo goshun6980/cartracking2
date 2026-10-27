@@ -891,7 +891,7 @@ window.onload = async function() {
                 await fetchVehiclesFromGAS();
                 closeVehicleModal();
                 showToast('車両情報を保存しました', 'success');
-            } else showToast('車両情報の保存に失敗しました。GAS接続とデプロイ設定を確認してください', 'warning');
+            } else showToast('車両情報の保存に失敗しました。GAS URL・デプロイ・権限を確認してください', 'warning');
         }
 
         async function deleteVehicle(id) {
@@ -1042,31 +1042,45 @@ window.onload = async function() {
         // ------------------------------------------------------------------
         async function gasRequest(action, payload = {}, method = 'GET') {
             if (!state.gasUrl) throw new Error('GAS URLが設定されていません');
-            const url = state.gasUrl;
-            const opts = { method, cache: 'no-store', redirect: 'follow' };
-            if (method === 'GET') {
-                const q = new URLSearchParams({ action, ...payload });
-                const target = url + (url.includes('?') ? '&' : '?') + q.toString();
-                opts.method = 'GET';
-                const res = await fetch(target, opts);
-                const raw = await res.text();
-                if (!res.ok) throw new Error(`GAS HTTP ${res.status}: ${raw.slice(0, 160)}`);
-                let data; try { data = JSON.parse(raw); } catch (_) { throw new Error(`GAS応答がJSONではありません: ${raw.slice(0, 160)}`); }
-                if (data && data.ok === false) throw new Error(data.error || 'GAS error');
-                state.lastNetworkCommunication = new Date(); state.isCurrentlyOffline = false; updateSyncBadgeStatus('synced');
-                return data;
+
+            // Google Apps Script WebアプリはPOST時にリダイレクトを挟むことがあり、
+            // GitHub Pagesからのfetchで「通信できない」状態になる場合があります。
+            // そこで書き込みもGETのクエリ方式を使用します。データ量が小さい
+            // 車両情報・位置情報・管理操作に限定しているため、この方式で安定性を優先します。
+            const isWrite = method !== 'GET';
+            const params = { action };
+            if (isWrite) {
+                params.payload = JSON.stringify(payload || {});
+            } else {
+                Object.assign(params, payload || {});
             }
-            opts.headers = { 'Content-Type': 'text/plain;charset=utf-8' };
-            opts.body = JSON.stringify({ action, ...payload });
-            const res = await fetch(url, opts);
+
+            const q = new URLSearchParams(params);
+            const target = state.gasUrl + (state.gasUrl.includes('?') ? '&' : '?') + q.toString();
+            const res = await fetch(target, {
+                method: 'GET',
+                cache: 'no-store',
+                redirect: 'follow'
+            });
             const raw = await res.text();
-            if (!res.ok) throw new Error(`GAS HTTP ${res.status}: ${raw.slice(0, 200)}`);
-            let data;
-            try { data = JSON.parse(raw); } catch (_) {
-                throw new Error(`GAS POST応答がJSONではありません: ${raw.slice(0, 200)}`);
+
+            if (!res.ok) {
+                throw new Error(`GAS HTTP ${res.status}: ${raw.slice(0, 200)}`);
             }
-            if (data && data.ok === false) throw new Error(data.error || 'GAS error');
-            state.lastNetworkCommunication = new Date(); state.isCurrentlyOffline = false; updateSyncBadgeStatus('synced');
+
+            let data;
+            try {
+                data = JSON.parse(raw);
+            } catch (_) {
+                throw new Error(`GAS応答がJSONではありません: ${raw.slice(0, 200)}`);
+            }
+            if (data && data.ok === false) {
+                throw new Error(data.error || 'GAS error');
+            }
+
+            state.lastNetworkCommunication = new Date();
+            state.isCurrentlyOffline = false;
+            updateSyncBadgeStatus('synced');
             return data;
         }
         // 一時的な空レスポンスで、既存の登録車両を「0台」にしないための保護。
