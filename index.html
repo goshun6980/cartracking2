@@ -560,7 +560,7 @@
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
                         pos => map.setView([pos.coords.latitude, pos.coords.longitude], 15),
-                        () => map.setView([35.1709, 136.8815], 13)
+                        () => map.setView([35.15250, 136.96861], 13)
                     );
                 }
             }
@@ -857,7 +857,7 @@
 
             let v = editingVehicleId && state.vehicles[editingVehicleId]
                 ? { ...state.vehicles[editingVehicleId], name, driverName, color }
-                : { id: vId, name, driverName, color, lat: 35.1709, lng: 136.8815, speed: 0, heading: 0, online: false, lastUpdated: new Date().toISOString() };
+                : { id: vId, name, driverName, color, lat: 35.15250, lng: 136.96861, speed: 0, heading: 0, online: false, lastUpdated: new Date().toISOString() };
             
             if (editingVehicleId) v.id = editingVehicleId;
 
