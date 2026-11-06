@@ -639,22 +639,22 @@
         }
 
         // DRIVER GPS TRANSMITTER LOGIC
-        function onConsentChange() {
-            const check = document.getElementById('gpsConsentCheck').checked;
-            const btn = document.getElementById('toggleGpsBtn');
-            btn.disabled = !check;
-            if (check) {
-                btn.classList.replace('bg-slate-300', 'bg-brand-600');
-                btn.classList.replace('dark:bg-slate-700', 'bg-brand-600');
-                btn.classList.replace('text-slate-500', 'text-white');
-                btn.classList.remove('cursor-not-allowed');
-            } else {
-                if (state.isTracking) toggleGpsTracking();
-                btn.classList.replace('bg-brand-600', 'bg-slate-300');
-                btn.classList.replace('bg-rose-600', 'bg-slate-300');
-                btn.classList.add('text-slate-500', 'cursor-not-allowed');
-            }
-        }
+      function onConsentCheck() {
+    const check = document.getElementById('gpsConsentCheck').checked;
+    const btn = document.getElementById('toggleGpsBtn');
+    btn.disabled = !check;
+    if (check) {
+        btn.classList.replace('bg-slate-300', 'bg-brand-600');
+        btn.classList.replace('dark:bg-slate-700', 'bg-brand-600');
+        btn.classList.replace('text-slate-500', 'text-white');
+        btn.classList.remove('cursor-not-allowed');
+    } else {
+        if (state.isTracking) toggleGpsTracking();
+        btn.classList.replace('bg-brand-600', 'bg-slate-300');
+        btn.classList.replace('bg-rose-600', 'bg-slate-300');
+        btn.classList.add('text-slate-500', 'cursor-not-allowed');
+    }
+}
 
         function toggleGpsTracking() {
             if (state.isTracking) {
@@ -953,9 +953,12 @@
             updateDisplayDateLabel();
         }
 
-        function updateDisplayDateLabel() {
-            document.getElementById('displayDateLabel').innerText = state.selectedDate.replace(/-/g, '/');
-        }
+function updateDisplayDateLabel() {
+    const label = document.getElementById('displayDateLabel');
+    if (label) {
+        label.innerText = state.selectedDate.replace(/-/g, '/');
+    }
+}
 
         // GAS API SYNC & SPREADSHEET READ/WRITE
         async function gasRequest(action, payload = {}, method = 'GET') {
