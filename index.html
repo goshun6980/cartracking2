@@ -1043,45 +1043,49 @@
         }
 
         // GAS API SYNC & SPREADSHEET READ/WRITE
-        async function gasRequest(action, payload = {}, method = 'GET') {
-            if (!state.gasUrl) throw new Error('GAS URLが設定されていません');
+async function gasRequest(action, payload = {}, method = 'GET') {
+    if (!state.gasUrl) throw new Error('GAS URLが設定されていません');
 
-            const isWrite = method !== 'GET';
-            const params = { action };
-            if (isWrite) {
-                params.payload = JSON.stringify(payload || {});
-            } else {
-                Object.assign(params, payload || {});
-            }
+    const isWrite = method !== 'GET';
+    const params = { action };
+    if (isWrite) {
+        params.payload = JSON.stringify(payload || {});
+    } else {
+        Object.assign(params, payload || {});
+    }
 
-            const q = new URLSearchParams(params);
-            const target = state.gasUrl + (state.gasUrl.includes('?') ? '&' : '?') + q.toString();
-            const res = await fetch(target, {
-                method: 'GET',
-                cache: 'no-store',
-                redirect: 'follow'
-            });
-            const raw = await res.text();
+    const q = new URLSearchParams(params);
+    const target = state.gasUrl + (state.gasUrl.includes('?') ? '&' : '?') + q.toString();
 
-            if (!res.ok) {
-                throw new Error(`GAS HTTP ${res.status}: ${raw.slice(0, 200)}`);
-            }
+    // ★ ここを編集：CORSモードとリダイレクト追従のオプションを明示します
+    const res = await fetch(target, {
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-store',
+        redirect: 'follow'
+    });
 
-            let data;
-            try {
-                data = JSON.parse(raw);
-            } catch (_) {
-                throw new Error(`GAS応答がJSONではありません: ${raw.slice(0, 200)}`);
-            }
-            if (data && data.ok === false) {
-                throw new Error(data.error || 'GAS error');
-            }
+    const raw = await res.text();
+    if (!res.ok) {
+        throw new Error(`GAS HTTP ${res.status}: ${raw.slice(0, 200)}`);
+    }
 
-            state.lastNetworkCommunication = new Date();
-            state.isCurrentlyOffline = false;
-            updateSyncBadgeStatus('synced');
-            return data;
-        }
+    let data;
+    try {
+        data = JSON.parse(raw);
+    } catch (_) {
+        throw new Error(`GAS応答がJSONではありません: ${raw.slice(0, 200)}`);
+    }
+
+    if (data && data.ok === false) {
+        throw new Error(data.error || 'GAS error');
+    }
+
+    state.lastNetworkCommunication = new Date();
+    state.isCurrentlyOffline = false;
+    updateSyncBadgeStatus('synced');
+    return data;
+}
 
         let lastGoodVehicleSnapshot = null;
         let consecutiveEmptyVehicleReads = 0;
