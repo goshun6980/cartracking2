@@ -92,19 +92,30 @@
         .animate-spin-custom {
             animation: spin 1s linear infinite;
         }
+        /* 逆回転アニメーション */
+@keyframes spin-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+.animate-spin-reverse {
+  animation: spin-reverse 1s linear infinite;
+}
     </style>
 </head>
 <body class="h-full bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col transition-colors duration-200">
 
     <!-- Top Header Bar -->
-    <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between shrink-0 shadow-sm z-30">
+<header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between shrink-0 shadow-sm z-30">
+    <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-brand-600 dark:text-brand-400 text-2xl md:text-3xl">directions_car</span>
         <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-brand-600 dark:text-brand-400 text-2xl md:text-3xl">directions_car</span>
-            <div>
-                <h1 class="text-base md:text-lg font-bold leading-tight">運行状況</h1>
-                <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Googleスプレッドシート + OSM</p>
-            </div>
+            <h1 class="text-base md:text-lg font-bold leading-tight">運行状況</h1>
+            <!-- 手動更新ボタン（自動取得・手動時に逆回転） -->
+            <button onclick="triggerManualReload()" class="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="データを再読み込み">
+                <span id="global-reload-icon" class="material-symbols-outlined text-xl">refresh</span>
+            </button>
         </div>
+    </div>
 
         <div class="flex items-center gap-2 md:gap-3">
             <!-- Mode Switcher Tabs (Desktop Only) -->
@@ -166,39 +177,6 @@
                     </div>
                 </div>
 
-                <!-- Timeline Playback Bar -->
-                <div class="absolute bottom-6 left-3 right-3 md:left-4 md:right-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-3 md:p-4 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-2">
-                    <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700">
-                            <button onclick="changeDate(-1)" class="p-0.5 text-slate-600 dark:text-slate-300 hover:text-brand-600 font-bold">◀</button>
-                            <span id="displayDateLabel" class="font-mono font-bold px-1 text-slate-800 dark:text-slate-100">YYYY/MM/DD</span>
-                            <button onclick="changeDate(1)" class="p-0.5 text-slate-600 dark:text-slate-300 hover:text-brand-600 font-bold">▶</button>
-                            <span id="displayTimeLabel" class="font-mono text-brand-600 dark:text-brand-400 font-bold ml-1">00:00:00</span>
-                        </div>
-
-                        <div class="flex items-center gap-2">
-                            <button id="playbackPlayBtn" onclick="togglePlayback()" class="px-3 py-1 rounded-lg bg-brand-600 text-white flex items-center gap-1 hover:bg-brand-700 shadow transition-transform active:scale-95 font-bold">
-                                <span class="material-symbols-outlined text-base">play_arrow</span> 再生
-                            </button>
-                            <button onclick="setPlaybackSpeed(1)" id="spd-1" class="px-2 py-1 rounded bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold hover:bg-brand-500 hover:text-white">1x</button>
-                            <button onclick="setPlaybackSpeed(4)" id="spd-4" class="px-2 py-1 rounded bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold hover:bg-brand-500 hover:text-white">4x</button>
-                            <button onclick="resetToRealtime()" class="px-2.5 py-1 rounded bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300 font-bold">リアルタイム</button>
-                        </div>
-                    </div>
-
-                    <div class="space-y-1">
-                        <input type="range" id="timelineSlider" min="0" max="86400" value="86400" oninput="onSliderChange(this.value)" class="w-full accent-brand-600 h-2 bg-slate-200 dark:bg-slate-800 rounded-lg cursor-pointer">
-                        <div class="flex justify-between text-[10px] font-mono text-slate-400 dark:text-slate-500 px-0.5">
-                            <span>00:00</span>
-                            <span>06:00</span>
-                            <span>12:00</span>
-                            <span>18:00</span>
-                            <span>24:00</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Vehicles Side Drawer -->
             <div id="vehicleDrawer" class="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col h-40 md:h-full z-10 shadow-lg transition-all duration-300">
                 <div class="p-3 border-b border-slate-200 dark:border-slate-800 font-bold text-xs flex items-center justify-between shrink-0">
@@ -246,9 +224,10 @@
                             <select id="driverVehicleSelect" class="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-bold focus:ring-2 focus:ring-brand-500">
                                 <!-- Populated dynamically -->
                             </select>
-                            <div id="driverSelectLoader" class="hidden absolute inset-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-xl flex items-center justify-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
-                                <span class="material-symbols-outlined animate-spin-custom">sync</span> スプレッドシートから読み込み中...
-                            </div>
+<div id="adminTableLoader" class="hidden absolute inset-0 bg-white/95 dark:bg-slate-900/95 z-20 flex flex-col items-center justify-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
+    <span class="material-symbols-outlined text-3xl animate-spin-custom">sync</span>
+    <span>スプレッドシートから最新データを読み込み中...</span>
+</div>
                         </div>
                     </div>
 
@@ -354,7 +333,7 @@
                     </div>
 
                     <!-- Loading Overlay for Admin Table -->
-                    <div id="adminTableLoader" class="hidden absolute inset-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
+                    <div id="adminTableLoader" class="hidden absolute inset-0 bg-white/80 dark:bg-slate-900/80 bg-white/95 dark:bg-slate-900/95 z-20 flex flex-col items-center justify-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
                         <span class="material-symbols-outlined text-3xl animate-spin-custom">sync</span>
                         <span>スプレッドシートから最新データを読み込み中...</span>
                     </div>
@@ -396,7 +375,7 @@
     </nav>
 
     <!-- MODAL: Vehicle Add / Edit -->
-    <div id="vehicleModal" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div id="vehicleModal" class="hidden fixed inset-0 bg-slate-950/70 bg-white/95 dark:bg-slate-900/95 z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
             <h3 id="vehicleModalTitle" class="text-base font-bold text-slate-900 dark:text-slate-100">車両情報の追加・編集</h3>
             
@@ -435,7 +414,7 @@
     </div>
 
     <!-- MODAL: GAS Config & Share Token URL -->
-    <div id="configModal" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div id="configModal" class="hidden fixed inset-0 bg-slate-950/70 bg-white/95 dark:bg-slate-900/95 z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
             <div class="flex justify-between items-center">
                 <h3 class="text-base font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100">
@@ -984,64 +963,6 @@
             document.getElementById('displayDateLabel').innerText = state.selectedDate.replace(/-/g, '/');
         }
 
-        function togglePlayback() {
-            state.playbackActive = !state.playbackActive;
-            const btn = document.getElementById('playbackPlayBtn');
-
-            if (state.playbackActive) {
-                btn.innerHTML = `<span class="material-symbols-outlined text-base">pause</span> 停止`;
-                runPlaybackLoop();
-            } else {
-                btn.innerHTML = `<span class="material-symbols-outlined text-base">play_arrow</span> 再生`;
-                clearTimeout(state.playbackTimer);
-            }
-        }
-
-        function runPlaybackLoop() {
-            if (!state.playbackActive) return;
-
-            let sec = parseInt(document.getElementById('timelineSlider').value);
-            sec += 60 * state.playbackSpeed;
-
-            if (sec >= 86400) sec = 0;
-            document.getElementById('timelineSlider').value = sec;
-            onSliderChange(sec);
-
-            state.playbackTimer = setTimeout(runPlaybackLoop, 500);
-        }
-
-        function onSliderChange(secondsVal) {
-            const hrs = String(Math.floor(secondsVal / 3600)).padStart(2, '0');
-            const mins = String(Math.floor((secondsVal % 3600) / 60)).padStart(2, '0');
-            const secs = String(secondsVal % 60).padStart(2, '0');
-            
-            document.getElementById('displayTimeLabel').innerText = `${hrs}:${mins}:${secs}`;
-            const targetTimeStr = `${state.selectedDate}T${hrs}:${mins}`;
-            const matchedLogs = state.historyLogs.filter(l => l.time && l.time.startsWith(targetTimeStr));
-
-            matchedLogs.forEach(log => {
-                if (mapMarkers[log.id]) {
-                    mapMarkers[log.id].setLatLng([log.lat, log.lng]);
-                }
-            });
-        }
-
-        function setPlaybackSpeed(spd) {
-            state.playbackSpeed = spd;
-            document.querySelectorAll('#spd-1, #spd-4').forEach(b => b.classList.remove('bg-brand-600', 'text-white'));
-            document.getElementById(`spd-${spd}`).classList.add('bg-brand-600', 'text-white');
-        }
-
-        function resetToRealtime() {
-            state.playbackActive = false;
-            state.selectedDate = new Date().toISOString().split('T')[0];
-            updateDisplayDateLabel();
-            document.getElementById('timelineSlider').value = 86400;
-            document.getElementById('displayTimeLabel').innerText = "リアルタイム";
-            document.getElementById('playbackPlayBtn').innerHTML = `<span class="material-symbols-outlined text-base">play_arrow</span> 再生`;
-            updateMapMarkers();
-        }
-
         // GAS API SYNC & SPREADSHEET READ/WRITE
 async function gasRequest(action, payload = {}, method = 'GET') {
     if (!state.gasUrl) throw new Error('GAS URLが設定されていません');
@@ -1544,6 +1465,38 @@ async function gasRequest(action, payload = {}, method = 'GET') {
             const dirs = ['北', '北東', '東', '南東', '南', '南西', '西', '北西'];
             return dirs[Math.round(angle / 45) % 8];
         }
+
+        // ローディング状態の切り替え時にアイコンのクラスを制御する関数
+function setGlobalLoading(isLoading) {
+    const icon = document.getElementById('global-reload-icon');
+    if (!icon) return;
+    
+    if (isLoading) {
+        icon.classList.add('animate-spin-reverse');
+    } else {
+        icon.classList.remove('animate-spin-reverse');
+    }
+}
+
+// 手動再読み込みボタンが押された時の処理
+async function triggerManualReload() {
+    try {
+        setGlobalLoading(true);
+        // 既存のデータ取得関数を呼び出し（例: fetchVehiclesFromGAS など）
+        if (typeof fetchVehiclesFromGAS === 'function') {
+            await fetchVehiclesFromGAS();
+        } else if (typeof loadData === 'function') {
+            await loadData();
+        }
+    } catch (e) {
+        console.error('手動更新エラー:', e);
+    } finally {
+        setGlobalLoading(false);
+    }
+}
+
+// 定期自動取得の際にもローディング中であれば回転させる
+// （既存のポーリング処理や fetch 呼び出しの前後で setGlobalLoading(true/false) を挟むと連動します）
     </script>
 </body>
 </html>
