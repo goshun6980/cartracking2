@@ -92,30 +92,22 @@
         .animate-spin-custom {
             animation: spin 1s linear infinite;
         }
-        /* 逆回転アニメーション */
-@keyframes spin-reverse {
-  from { transform: rotate(360deg); }
-  to { transform: rotate(0deg); }
-}
-.animate-spin-reverse {
-  animation: spin-reverse 1s linear infinite;
-}
     </style>
 </head>
 <body class="h-full bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col transition-colors duration-200">
 
     <!-- Top Header Bar -->
-<header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between shrink-0 shadow-sm z-30">
-    <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-brand-600 dark:text-brand-400 text-2xl md:text-3xl">directions_car</span>
+    <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between shrink-0 shadow-sm z-30">
         <div class="flex items-center gap-2">
-            <h1 class="text-base md:text-lg font-bold leading-tight">運行状況</h1>
-            <!-- 手動更新ボタン（自動取得・手動時に逆回転） -->
-            <button onclick="triggerManualReload()" class="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="データを再読み込み">
-                <span id="global-reload-icon" class="material-symbols-outlined text-xl">refresh</span>
-            </button>
+            <span class="material-symbols-outlined text-brand-600 dark:text-brand-400 text-2xl md:text-3xl">directions_car</span>
+            <div class="flex items-center gap-2">
+                <h1 class="text-base md:text-lg font-bold leading-tight">運行状況</h1>
+                <!-- 手動更新ボタン（自動取得・手動時に右回転） -->
+                <button onclick="triggerManualReload()" class="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="データを再読み込み">
+                    <span id="global-reload-icon" class="material-symbols-outlined text-xl">refresh</span>
+                </button>
+            </div>
         </div>
-    </div>
 
         <div class="flex items-center gap-2 md:gap-3">
             <!-- Mode Switcher Tabs (Desktop Only) -->
@@ -176,8 +168,9 @@
                         </button>
                     </div>
                 </div>
+            </div>
 
-            <!-- Vehicles Side Drawer -->
+            <!-- Vehicles Side Drawer (折りたたみ機能付き) -->
             <div id="vehicleDrawer" class="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col h-40 md:h-full z-10 shadow-lg transition-all duration-300">
                 <div class="p-3 border-b border-slate-200 dark:border-slate-800 font-bold text-xs flex items-center justify-between shrink-0">
                     <span class="flex items-center gap-1.5 text-slate-800 dark:text-slate-100">
@@ -186,7 +179,8 @@
                     </span>
                     <div class="flex items-center gap-2">
                         <span id="vehicleCountBadge" class="bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300 text-[11px] px-2 py-0.5 rounded-full font-bold">0台</span>
-                        <button onclick="toggleVehicleDrawer()" class="md:hidden text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
+                        <!-- PC・モバイル両対応の折りたたみボタン -->
+                        <button onclick="toggleVehicleDrawer()" class="text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition" title="リストを開閉">
                             <span id="drawerToggleIcon" class="material-symbols-outlined text-base">expand_more</span>
                         </button>
                     </div>
@@ -224,17 +218,17 @@
                             <select id="driverVehicleSelect" class="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-bold focus:ring-2 focus:ring-brand-500">
                                 <!-- Populated dynamically -->
                             </select>
-<div id="adminTableLoader" class="hidden absolute inset-0 bg-white/95 dark:bg-slate-900/95 z-20 flex flex-col items-center justify-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
-    <span class="material-symbols-outlined text-3xl animate-spin-custom">sync</span>
-    <span>スプレッドシートから最新データを読み込み中...</span>
-</div>
+                            <div id="adminTableLoader" class="hidden absolute inset-0 bg-white/95 dark:bg-slate-900/95 z-20 flex flex-col items-center justify-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
+                                <span class="material-symbols-outlined text-3xl animate-spin-custom">sync</span>
+                                <span>スプレッドシートから最新データを読み込み中...</span>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Consent and GPS Toggle -->
                     <div class="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
                         <label class="flex items-start gap-2.5 cursor-pointer">
-                            <input type="checkbox" id="gpsConsentCheck" onchange="onConsentChange()" class="mt-0.5 w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500">
+                            <input type="checkbox" id="gpsConsentCheck" onchange="onConsentCheck()" class="mt-0.5 w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500">
                             <span class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-bold">
                                 継続的な位置情報送信およびリアルタイム共有に同意します。
                             </span>
@@ -964,49 +958,48 @@
         }
 
         // GAS API SYNC & SPREADSHEET READ/WRITE
-async function gasRequest(action, payload = {}, method = 'GET') {
-    if (!state.gasUrl) throw new Error('GAS URLが設定されていません');
+        async function gasRequest(action, payload = {}, method = 'GET') {
+            if (!state.gasUrl) throw new Error('GAS URLが設定されていません');
 
-    const isWrite = method !== 'GET';
-    const params = { action };
-    if (isWrite) {
-        params.payload = JSON.stringify(payload || {});
-    } else {
-        Object.assign(params, payload || {});
-    }
+            const isWrite = method !== 'GET';
+            const params = { action };
+            if (isWrite) {
+                params.payload = JSON.stringify(payload || {});
+            } else {
+                Object.assign(params, payload || {});
+            }
 
-    const q = new URLSearchParams(params);
-    const target = state.gasUrl + (state.gasUrl.includes('?') ? '&' : '?') + q.toString();
+            const q = new URLSearchParams(params);
+            const target = state.gasUrl + (state.gasUrl.includes('?') ? '&' : '?') + q.toString();
 
-    // ★ ここを編集：CORSモードとリダイレクト追従のオプションを明示します
-    const res = await fetch(target, {
-        method: 'GET',
-        mode: 'cors',
-        cache: 'no-store',
-        redirect: 'follow'
-    });
+            const res = await fetch(target, {
+                method: 'GET',
+                mode: 'cors',
+                cache: 'no-store',
+                redirect: 'follow'
+            });
 
-    const raw = await res.text();
-    if (!res.ok) {
-        throw new Error(`GAS HTTP ${res.status}: ${raw.slice(0, 200)}`);
-    }
+            const raw = await res.text();
+            if (!res.ok) {
+                throw new Error(`GAS HTTP ${res.status}: ${raw.slice(0, 200)}`);
+            }
 
-    let data;
-    try {
-        data = JSON.parse(raw);
-    } catch (_) {
-        throw new Error(`GAS応答がJSONではありません: ${raw.slice(0, 200)}`);
-    }
+            let data;
+            try {
+                data = JSON.parse(raw);
+            } catch (_) {
+                throw new Error(`GAS応答がJSONではありません: ${raw.slice(0, 200)}`);
+            }
 
-    if (data && data.ok === false) {
-        throw new Error(data.error || 'GAS error');
-    }
+            if (data && data.ok === false) {
+                throw new Error(data.error || 'GAS error');
+            }
 
-    state.lastNetworkCommunication = new Date();
-    state.isCurrentlyOffline = false;
-    updateSyncBadgeStatus('synced');
-    return data;
-}
+            state.lastNetworkCommunication = new Date();
+            state.isCurrentlyOffline = false;
+            updateSyncBadgeStatus('synced');
+            return data;
+        }
 
         let lastGoodVehicleSnapshot = null;
         let consecutiveEmptyVehicleReads = 0;
@@ -1056,9 +1049,16 @@ async function gasRequest(action, payload = {}, method = 'GET') {
             }
         }
 
-        // ローディング表示の制御
+        // ローディング表示の制御（すべて右回転に統一）
         function showLoadingIndicators(show) {
             state.isLoadingVehicles = show;
+
+            // ヘッダーの再読み込みアイコンの右回転制御
+            const globalIcon = document.getElementById('global-reload-icon');
+            if (globalIcon) {
+                if (show) globalIcon.classList.add('animate-spin-custom');
+                else globalIcon.classList.remove('animate-spin-custom');
+            }
 
             // 管理画面のローダー
             const adminLoader = document.getElementById('adminTableLoader');
@@ -1236,6 +1236,27 @@ async function gasRequest(action, payload = {}, method = 'GET') {
             if (state.adminAuthenticated) renderAdminTable();
         }
 
+        // 指定した車両に地図をフォーカスしてポップアップを開く
+        function focusOnVehicle(id) {
+            const v = state.vehicles[id];
+            if (!v || !map) return;
+            
+            map.setView([v.lat, v.lng], 16, { animate: true });
+            
+            if (mapMarkers[id]) {
+                mapMarkers[id].openPopup();
+            }
+            
+            if (window.innerWidth < 768) {
+                const drawer = document.getElementById('vehicleDrawer');
+                const icon = document.getElementById('drawerToggleIcon');
+                if (drawer && !drawer.classList.contains('h-10')) {
+                    drawer.classList.replace('h-40', 'h-10');
+                    if (icon) icon.innerText = 'expand_less';
+                }
+            }
+        }
+
         function renderAdminTable() {
             const adminBody = document.getElementById('adminVehicleTableBody');
             if (!adminBody) return;
@@ -1363,12 +1384,21 @@ async function gasRequest(action, payload = {}, method = 'GET') {
         function toggleVehicleDrawer() {
             const drawer = document.getElementById('vehicleDrawer');
             const icon = document.getElementById('drawerToggleIcon');
-            if (drawer.classList.contains('h-40')) {
-                drawer.classList.replace('h-40', 'h-10');
-                icon.innerText = 'expand_less';
+            
+            if (window.innerWidth < 768) {
+                if (drawer.classList.contains('h-40')) {
+                    drawer.classList.replace('h-40', 'h-10');
+                    icon.innerText = 'expand_less';
+                } else {
+                    drawer.classList.replace('h-10', 'h-40');
+                    icon.innerText = 'expand_more';
+                }
             } else {
-                drawer.classList.replace('h-10', 'h-40');
-                icon.innerText = 'expand_more';
+                if (drawer.style.width === '56px') {
+                    drawer.style.width = '20rem';
+                    icon.innerText = 'chevron_right';
+                } else {
+                }
             }
         }
 
@@ -1466,37 +1496,16 @@ async function gasRequest(action, payload = {}, method = 'GET') {
             return dirs[Math.round(angle / 45) % 8];
         }
 
-        // ローディング状態の切り替え時にアイコンのクラスを制御する関数
-function setGlobalLoading(isLoading) {
-    const icon = document.getElementById('global-reload-icon');
-    if (!icon) return;
-    
-    if (isLoading) {
-        icon.classList.add('animate-spin-reverse');
-    } else {
-        icon.classList.remove('animate-spin-reverse');
-    }
-}
-
-// 手動再読み込みボタンが押された時の処理
-async function triggerManualReload() {
-    try {
-        setGlobalLoading(true);
-        // 既存のデータ取得関数を呼び出し（例: fetchVehiclesFromGAS など）
-        if (typeof fetchVehiclesFromGAS === 'function') {
-            await fetchVehiclesFromGAS();
-        } else if (typeof loadData === 'function') {
-            await loadData();
+        // 手動再読み込みボタンが押された時の処理（右回転アイコンと連動）
+        async function triggerManualReload() {
+            try {
+                if (typeof fetchVehiclesFromGAS === 'function') {
+                    await fetchVehiclesFromGAS(true);
+                }
+            } catch (e) {
+                console.error('手動更新エラー:', e);
+            }
         }
-    } catch (e) {
-        console.error('手動更新エラー:', e);
-    } finally {
-        setGlobalLoading(false);
-    }
-}
-
-// 定期自動取得の際にもローディング中であれば回転させる
-// （既存のポーリング処理や fetch 呼び出しの前後で setGlobalLoading(true/false) を挟むと連動します）
     </script>
 </body>
 </html>
