@@ -103,8 +103,10 @@
             <div class="flex items-center gap-2">
                 <h1 class="text-base md:text-lg font-bold leading-tight">運行状況</h1>
                 <!-- 手動更新ボタン（自動取得・手動時に右回転） -->
-                <button onclick="triggerManualReload()" class="p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="データを再読み込み">
+                <button id="global-reload-btn" onclick="triggerManualReload()" class="relative p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="データを再読み込み">
                     <span id="global-reload-icon" class="material-symbols-outlined text-xl">refresh</span>
+                 <!-- カウントダウン秒数表示用バッジ -->
+                    <span id="reloadCountdown" class="absolute inset-0 flex items-center justify-center text-[9px] font-bold"></span>
                 </button>
             </div>
         </div>
@@ -481,6 +483,9 @@
             playbackTimer: null,
 
             osmTimerSeconds: 10
+
+            reloadCooldown: 0, // 追加: クールダウン秒数管理
+            cooldownTimer: null // 追加: タイマーID
         };
 
         let map, mapMarkers = {}, historyPolyline = null;
@@ -1153,12 +1158,16 @@ function updateDisplayDateLabel() {
         }
 
         function startFastPolling() {
-            setInterval(() => {
-                if (state.gasUrl && !state.isTracking && !state.isLoadingVehicles) {
-                    fetchVehiclesFromGAS(false);
-                }
-                evaluateSyncHealth();
-            }, 10000);
+        setInterval(() => {
+        if (state.gasUrl && !state.isLoadingVehicles) {
+            // 位置情報送信中(isTracking)または管理画面等の場合は30秒、閲覧のみ(地図)は60秒など
+            const intervalSec = state.isTracking ? 30 : (state.currentView === 'map' ? 60 : 30);
+            // ここではシンプルに30秒または60秒で自動取得
+            fetchVehiclesFromGAS(false);
+        }
+        evaluateSyncHealth();
+    }, state.isTracking ? 30000 : 60000); 
+}
         }
 
         function evaluateSyncHealth() {
@@ -1500,14 +1509,41 @@ function updateDisplayDateLabel() {
         }
 
         // 手動再読み込みボタンが押された時の処理（右回転アイコンと連動）
-        async function triggerManualReload() {
-            try {
-                if (typeof fetchVehiclesFromGAS === 'function') {
-                    await fetchVehiclesFromGAS(true);
-                }
-            } catch (e) {
-                console.error('手動更新エラー:', e);
-            }
+async function triggerManualReload() {
+    if (state.reloadCooldown > 0 || state.isLoadingVehicles) return; // クールダウン中や読込中は二重押し防止
+
+    try {
+        await fetchVehiclesFromGAS(true);
+        startCooldown(state.isTracking ? 30 : 60); // 状況に応じて30秒または60秒のクールダウン
+        showToast("データを手動更新しました", "success");
+    } catch (e) {
+        console.error('手動更新エラー:', e);
+        showToast("更新に失敗しました", "warning");
+    }
+}
+// カウントダウンを開始する関数
+function startCooldown(seconds) {
+    state.reloadCooldown = seconds;
+    const btn = document.getElementById('global-reload-btn');
+    const countdownElem = document.getElementById('reloadCountdown');
+    if (btn) btn.disabled = true;
+
+    if (state.cooldownTimer) clearInterval(state.cooldownTimer);
+
+    state.cooldownTimer = setInterval(() => {
+        state.reloadCooldown--;
+        if (countdownElem) {
+            countdownElem.innerText = state.reloadCooldown > 0 ? state.reloadCooldown : '';
+        }
+
+        if (state.reloadCooldown <= 0) {
+            clearInterval(state.cooldownTimer);
+            if (btn) btn.disabled = false;
+            if (countdownElem) countdownElem.innerText = '';
+        }
+    }, 1000);
+}
+        
         }
     </script>
 </body>
