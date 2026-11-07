@@ -102,10 +102,9 @@
             <span class="material-symbols-outlined text-brand-600 dark:text-brand-400 text-2xl md:text-3xl">directions_car</span>
             <div class="flex items-center gap-2">
                 <h1 class="text-base md:text-lg font-bold leading-tight">運行状況</h1>
-                <!-- 手動更新ボタン（自動取得・手動時に右回転） -->
+                <!-- 手動更新ボタン（クールダウン中は無効化＆カウントダウン表示） -->
                 <button id="global-reload-btn" onclick="triggerManualReload()" class="relative p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="データを再読み込み">
                     <span id="global-reload-icon" class="material-symbols-outlined text-xl">refresh</span>
-                 <!-- カウントダウン秒数表示用バッジ -->
                     <span id="reloadCountdown" class="absolute inset-0 flex items-center justify-center text-[9px] font-bold"></span>
                 </button>
             </div>
@@ -215,14 +214,13 @@
                             </button>
                         </div>
 
-                        <!-- Driver Select with Loading Indicator -->
+                        <!-- Driver Select with Loading Indicator (ぼかしなし) -->
                         <div class="relative">
                             <select id="driverVehicleSelect" class="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-bold focus:ring-2 focus:ring-brand-500">
                                 <!-- Populated dynamically -->
                             </select>
-                            <div id="adminTableLoader" class="hidden absolute inset-0 bg-white/95 dark:bg-slate-900/95 z-20 flex flex-col items-center justify-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
-                                <span class="material-symbols-outlined text-3xl animate-spin-custom">sync</span>
-                                <span>スプレッドシートから最新データを読み込み中...</span>
+                            <div id="driverSelectLoader" class="hidden absolute inset-0 bg-white/95 dark:bg-slate-900/95 rounded-xl z-20 flex items-center justify-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
+                                <span class="material-symbols-outlined animate-spin-custom">sync</span> スプレッドシートから読み込み中...
                             </div>
                         </div>
                     </div>
@@ -319,7 +317,7 @@
                     </div>
                 </div>
 
-                <!-- Vehicles Table with Loader -->
+                <!-- Vehicles Table with Loader (ぼかしなし) -->
                 <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm relative min-h-[250px]">
                     <div class="p-4 border-b border-slate-200 dark:border-slate-800 font-bold text-xs flex justify-between items-center text-slate-800 dark:text-slate-200">
                         <span class="flex items-center gap-1.5">
@@ -329,7 +327,7 @@
                     </div>
 
                     <!-- Loading Overlay for Admin Table -->
-                    <div id="adminTableLoader" class="hidden absolute inset-0 bg-white/80 dark:bg-slate-900/80 bg-white/95 dark:bg-slate-900/95 z-20 flex flex-col items-center justify-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
+                    <div id="adminTableLoader" class="hidden absolute inset-0 bg-white/95 dark:bg-slate-900/95 z-20 flex flex-col items-center justify-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
                         <span class="material-symbols-outlined text-3xl animate-spin-custom">sync</span>
                         <span>スプレッドシートから最新データを読み込み中...</span>
                     </div>
@@ -371,7 +369,7 @@
     </nav>
 
     <!-- MODAL: Vehicle Add / Edit -->
-    <div id="vehicleModal" class="hidden fixed inset-0 bg-slate-950/70 bg-white/95 dark:bg-slate-900/95 z-50 flex items-center justify-center p-4">
+    <div id="vehicleModal" class="hidden fixed inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
             <h3 id="vehicleModalTitle" class="text-base font-bold text-slate-900 dark:text-slate-100">車両情報の追加・編集</h3>
             
@@ -410,7 +408,7 @@
     </div>
 
     <!-- MODAL: GAS Config & Share Token URL -->
-    <div id="configModal" class="hidden fixed inset-0 bg-slate-950/70 bg-white/95 dark:bg-slate-900/95 z-50 flex items-center justify-center p-4">
+    <div id="configModal" class="hidden fixed inset-0 bg-slate-950/70 z-50 flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
             <div class="flex justify-between items-center">
                 <h3 class="text-base font-bold flex items-center gap-2 text-slate-900 dark:text-slate-100">
@@ -475,17 +473,11 @@
             lastNetworkCommunication: null,
             isCurrentlyOffline: false,
 
-            // Timeline Playback State
-            playbackActive: false,
-            selectedDate: new Date().toISOString().split('T')[0],
-            sliderSeconds: 86400,
-            playbackSpeed: 1,
-            playbackTimer: null,
+            // Manual Reload CoolDown state
+            reloadCooldown: 0,
+            cooldownTimer: null,
 
             osmTimerSeconds: 10
-
-            reloadCooldown: 0, // 追加: クールダウン秒数管理
-            cooldownTimer: null // 追加: タイマーID
         };
 
         let map, mapMarkers = {}, historyPolyline = null;
@@ -644,22 +636,22 @@
         }
 
         // DRIVER GPS TRANSMITTER LOGIC
-      function onConsentCheck() {
-    const check = document.getElementById('gpsConsentCheck').checked;
-    const btn = document.getElementById('toggleGpsBtn');
-    btn.disabled = !check;
-    if (check) {
-        btn.classList.replace('bg-slate-300', 'bg-brand-600');
-        btn.classList.replace('dark:bg-slate-700', 'bg-brand-600');
-        btn.classList.replace('text-slate-500', 'text-white');
-        btn.classList.remove('cursor-not-allowed');
-    } else {
-        if (state.isTracking) toggleGpsTracking();
-        btn.classList.replace('bg-brand-600', 'bg-slate-300');
-        btn.classList.replace('bg-rose-600', 'bg-slate-300');
-        btn.classList.add('text-slate-500', 'cursor-not-allowed');
-    }
-}
+        function onConsentCheck() {
+            const check = document.getElementById('gpsConsentCheck').checked;
+            const btn = document.getElementById('toggleGpsBtn');
+            btn.disabled = !check;
+            if (check) {
+                btn.classList.replace('bg-slate-300', 'bg-brand-600');
+                btn.classList.replace('dark:bg-slate-700', 'bg-brand-600');
+                btn.classList.replace('text-slate-500', 'text-white');
+                btn.classList.remove('cursor-not-allowed');
+            } else {
+                if (state.isTracking) toggleGpsTracking();
+                btn.classList.replace('bg-brand-600', 'bg-slate-300');
+                btn.classList.replace('bg-rose-600', 'bg-slate-300');
+                btn.classList.add('text-slate-500', 'cursor-not-allowed');
+            }
+        }
 
         function toggleGpsTracking() {
             if (state.isTracking) {
@@ -798,7 +790,7 @@
                 const v = state.vehicles[id];
                 document.getElementById('vehicleModalTitle').innerText = "車両情報の編集";
                 document.getElementById('modalVehicleId').value = v.id;
-                document.getElementById('modalVehicleId').disabled = true; // IDは編集不可
+                document.getElementById('modalVehicleId').disabled = true;
                 document.getElementById('modalVehicleName').value = v.name;
                 document.getElementById('modalDriverName').value = v.driverName || '';
                 document.getElementById('modalVehicleColor').value = v.color || "#6366f1";
@@ -818,9 +810,8 @@
             document.getElementById('vehicleModal').classList.add('hidden');
         }
 
-        // 重複車両ID警告のバリデーション
         function validateVehicleIdDuplicate() {
-            if (editingVehicleId) return; // 編集時はチェックしない
+            if (editingVehicleId) return;
 
             const inputId = document.getElementById('modalVehicleId').value.trim();
             const warningElem = document.getElementById('duplicateWarning');
@@ -848,7 +839,6 @@
                 return; 
             }
 
-            // 新規作成時の重複拒否
             if (!editingVehicleId && state.vehicles[vId]) {
                 showToast(`車両ID「${vId}」は既に使用されています`, 'warning');
                 return;
@@ -950,20 +940,12 @@
             exportCSV(null);
         }
 
-        // TIMELINE PLAYBACK SCRUBBER
-        function changeDate(offsetDays) {
-            const current = new Date(state.selectedDate);
-            current.setDate(current.getDate() + offsetDays);
-            state.selectedDate = current.toISOString().split('T')[0];
-            updateDisplayDateLabel();
+        function updateDisplayDateLabel() {
+            const label = document.getElementById('displayDateLabel');
+            if (label) {
+                label.innerText = (state.selectedDate || '').replace(/-/g, '/');
+            }
         }
-
-function updateDisplayDateLabel() {
-    const label = document.getElementById('displayDateLabel');
-    if (label) {
-        label.innerText = state.selectedDate.replace(/-/g, '/');
-    }
-}
 
         // GAS API SYNC & SPREADSHEET READ/WRITE
         async function gasRequest(action, payload = {}, method = 'GET') {
@@ -1012,7 +994,6 @@ function updateDisplayDateLabel() {
         let lastGoodVehicleSnapshot = null;
         let consecutiveEmptyVehicleReads = 0;
 
-        // スプレッドシートからのデータ読み込み（ローディング表示対応）
         async function fetchVehiclesFromGAS(userInitiated = false) {
             if (!state.gasUrl) {
                 updateSyncBadgeStatus('demo');
@@ -1057,32 +1038,28 @@ function updateDisplayDateLabel() {
             }
         }
 
-        // ローディング表示の制御（すべて右回転に統一）
+        // ローディング表示の制御（すべて右回転）
         function showLoadingIndicators(show) {
             state.isLoadingVehicles = show;
 
-            // ヘッダーの再読み込みアイコンの右回転制御
             const globalIcon = document.getElementById('global-reload-icon');
             if (globalIcon) {
                 if (show) globalIcon.classList.add('animate-spin-custom');
                 else globalIcon.classList.remove('animate-spin-custom');
             }
 
-            // 管理画面のローダー
             const adminLoader = document.getElementById('adminTableLoader');
             if (adminLoader) {
                 if (show) adminLoader.classList.remove('hidden');
                 else adminLoader.classList.add('hidden');
             }
 
-            // 位置送信画面のローダー
             const driverLoader = document.getElementById('driverSelectLoader');
             if (driverLoader) {
                 if (show) driverLoader.classList.remove('hidden');
                 else driverLoader.classList.add('hidden');
             }
 
-            // リフレッシュアイコンのアニメーション
             ['adminRefreshIcon', 'driverRefreshIcon'].forEach(id => {
                 const icon = document.getElementById(id);
                 if (icon) {
@@ -1157,17 +1134,50 @@ function updateDisplayDateLabel() {
             }
         }
 
+        // ポーリング頻度の分岐設定（送信中・管理は30秒、閲覧のみは60秒）
         function startFastPolling() {
-        setInterval(() => {
-        if (state.gasUrl && !state.isLoadingVehicles) {
-            // 位置情報送信中(isTracking)または管理画面等の場合は30秒、閲覧のみ(地図)は60秒など
-            const intervalSec = state.isTracking ? 30 : (state.currentView === 'map' ? 60 : 30);
-            // ここではシンプルに30秒または60秒で自動取得
-            fetchVehiclesFromGAS(false);
+            setInterval(() => {
+                if (state.gasUrl && !state.isLoadingVehicles) {
+                    fetchVehiclesFromGAS(false);
+                }
+                evaluateSyncHealth();
+            }, state.isTracking ? 30000 : (state.currentView === 'map' ? 60000 : 30000));
         }
-        evaluateSyncHealth();
-    }, state.isTracking ? 30000 : 60000); 
-}
+
+        // 手動再読み込みボタン処理（クールダウン・カウントダウン・排他制御つき）
+        async function triggerManualReload() {
+            if (state.reloadCooldown > 0 || state.isLoadingVehicles) return;
+
+            try {
+                await fetchVehiclesFromGAS(true);
+                startCooldown(state.isTracking ? 30 : 60);
+                showToast("データを手動更新しました", "success");
+            } catch (e) {
+                console.error('手動更新エラー:', e);
+                showToast("更新に失敗しました", "warning");
+            }
+        }
+
+        function startCooldown(seconds) {
+            state.reloadCooldown = seconds;
+            const btn = document.getElementById('global-reload-btn');
+            const countdownElem = document.getElementById('reloadCountdown');
+            if (btn) btn.disabled = true;
+
+            if (state.cooldownTimer) clearInterval(state.cooldownTimer);
+
+            state.cooldownTimer = setInterval(() => {
+                state.reloadCooldown--;
+                if (countdownElem) {
+                    countdownElem.innerText = state.reloadCooldown > 0 ? state.reloadCooldown : '';
+                }
+
+                if (state.reloadCooldown <= 0) {
+                    clearInterval(state.cooldownTimer);
+                    if (btn) btn.disabled = false;
+                    if (countdownElem) countdownElem.innerText = '';
+                }
+            }, 1000);
         }
 
         function evaluateSyncHealth() {
@@ -1207,7 +1217,6 @@ function updateDisplayDateLabel() {
             populateVehicleSelects();
             renderVehicleLists();
             updateMapMarkers();
-            if (!state.playbackActive) autoFitMapBounds();
         }
 
         function renderVehicleLists() {
@@ -1409,7 +1418,6 @@ function updateDisplayDateLabel() {
                 if (drawer.style.width === '56px') {
                     drawer.style.width = '20rem';
                     icon.innerText = 'chevron_right';
-                } else {
                 }
             }
         }
@@ -1506,44 +1514,6 @@ function updateDisplayDateLabel() {
         function getCardinalDirection(angle) {
             const dirs = ['北', '北東', '東', '南東', '南', '南西', '西', '北西'];
             return dirs[Math.round(angle / 45) % 8];
-        }
-
-        // 手動再読み込みボタンが押された時の処理（右回転アイコンと連動）
-async function triggerManualReload() {
-    if (state.reloadCooldown > 0 || state.isLoadingVehicles) return; // クールダウン中や読込中は二重押し防止
-
-    try {
-        await fetchVehiclesFromGAS(true);
-        startCooldown(state.isTracking ? 30 : 60); // 状況に応じて30秒または60秒のクールダウン
-        showToast("データを手動更新しました", "success");
-    } catch (e) {
-        console.error('手動更新エラー:', e);
-        showToast("更新に失敗しました", "warning");
-    }
-}
-// カウントダウンを開始する関数
-function startCooldown(seconds) {
-    state.reloadCooldown = seconds;
-    const btn = document.getElementById('global-reload-btn');
-    const countdownElem = document.getElementById('reloadCountdown');
-    if (btn) btn.disabled = true;
-
-    if (state.cooldownTimer) clearInterval(state.cooldownTimer);
-
-    state.cooldownTimer = setInterval(() => {
-        state.reloadCooldown--;
-        if (countdownElem) {
-            countdownElem.innerText = state.reloadCooldown > 0 ? state.reloadCooldown : '';
-        }
-
-        if (state.reloadCooldown <= 0) {
-            clearInterval(state.cooldownTimer);
-            if (btn) btn.disabled = false;
-            if (countdownElem) countdownElem.innerText = '';
-        }
-    }, 1000);
-}
-        
         }
     </script>
 </body>
