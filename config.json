@@ -50,8 +50,8 @@
     ]
   },
   "timerSettings": {
-    "maxMinutes": 60,
-    "warningMinutes": 45,
-    "dangerMinutes": 55
+    "maxMinutes": 45,
+    "warningMinutes": 30,
+    "dangerMinutes": 40
   }
 }
