@@ -828,31 +828,46 @@
             sendGateEventToGAS(vehicleId, 'ENTRY', gateName, timestamp);
         }
 
-        // 出講処理
+        // 修正対象: triggerExitEvent 関数を探して以下のように差し替えてください
         function triggerExitEvent(vehicleId, gateName, timestamp) {
             const v = state.vehicles[vehicleId];
-            if (v && !v.isInside) return; // 既に構外なら重複スキップ
-
             if (v) {
                 v.isInside = false;
                 v.entryGateName = "";
-                v.entryTime = null;
+                v.entryTime = null; // 入構時刻をクリア
             }
 
-            if (vehicleId === state.activeDriverVehicleId) {
+            // 操作中の車両が現在ドライバー画面で選択されている車両であれば、即座に画面をリセット
+            if (vehicleId === document.getElementById('driverVehicleSelect').value) {
                 state.activeEntryState.isInside = false;
                 state.activeEntryState.entryGateName = "";
                 state.activeEntryState.entryTime = null;
                 state.activeEntryState.elapsedSeconds = 0;
-                state.activeEntryState.lastGateName = gateName;
 
-                document.getElementById('gateStatusBadge').innerText = "構外 (出講完了)";
-                document.getElementById('gateStatusBadge').className = "text-[11px] px-2.5 py-1 rounded-full font-bold bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400";
-                document.getElementById('entryTimeLabel').innerText = "--:--";
-                document.getElementById('lastGateLabel').innerText = gateName;
+                // 画面のステータスバッジを「構外」に変更
+                const badge = document.getElementById('gateStatusBadge');
+                if (badge) {
+                    badge.innerText = "構外 (出講完了)";
+                    badge.className = "text-[11px] px-2.5 py-1 rounded-full font-bold bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400";
+                }
+
+                const entryTimeLbl = document.getElementById('entryTimeLabel');
+                if (entryTimeLbl) entryTimeLbl.innerText = "--:--";
+
+                const lastGateLbl = document.getElementById('lastGateLabel');
+                if (lastGateLbl) lastGateLbl.innerText = gateName;
+
+                // ストップウオッチとインジケーターを強制リセット
+                updateStopwatchDisplay(0);
+                updateIndicatorUI(0);
+
                 showToast(`【出講検知】${gateName} を通過しました`, "info");
             }
 
+            // 車両リストやマップ上の表示も更新
+            refreshLocalUI();
+
+            // スプレッドシートへイベント記録
             sendGateEventToGAS(vehicleId, 'EXIT', gateName, timestamp);
         }
 
@@ -1741,7 +1756,7 @@
             updateIndicatorUI(0);
         }
 
-        // 最寄りゲートを検索して手動で入構/出講を行う関数
+        // 最寄りゲートを検索して手動で入構/出講を行う関数（安全装置付き）
         async function manualGateAction(eventType) {
             const vId = document.getElementById('driverVehicleSelect').value;
             if (!vId || !state.vehicles[vId]) {
@@ -1753,49 +1768,49 @@
             const currentLat = v.lat || 35.15250;
             const currentLng = v.lng || 136.96861;
 
-            // config.json のゲート設定から最寄りのゲートを検索
-            const targetGates = (eventType === 'ENTRY')
-                ? state.gateSettings.entryGates
-                : state.gateSettings.exitGates;
+            // config.json からゲートリストを取得。もし読み込まれていなくてもデフォルト値を使用する
+            let targetGates = (eventType === 'ENTRY')
+                ? (state.gateSettings && state.gateSettings.entryGates)
+                : (state.gateSettings && state.gateSettings.exitGates);
 
             if (!targetGates || targetGates.length === 0) {
-                showToast("ゲート設定が見つかりません", "warning");
-                return;
+                // config.jsonが未読込のときの安全装置（デフォルト座標）
+                if (eventType === 'ENTRY') {
+                    targetGates = [
+                        { name: "鏡ヶ池ゲート（入構）", cp2: { lat: 35.157390, lng: 136.964198 } },
+                        { name: "南部ゲート（入構）", cp2: { lat: 35.153261, lng: 136.963149 } },
+                        { name: "東部ゲート（入構）", cp2: { lat: 35.153377, lng: 136.966822 } }
+                    ];
+                } else {
+                    targetGates = [
+                        { name: "東部ゲート（出講）", cp2: { lat: 35.153535, lng: 136.966417 } },
+                        { name: "南部ゲート（出講）", cp2: { lat: 35.152891, lng: 136.963047 } },
+                        { name: "IBゲート（出講）", cp2: { lat: 35.154448, lng: 136.966293 } }
+                    ];
+                }
             }
 
             let nearestGate = null;
             let minDistance = Infinity;
 
             targetGates.forEach(g => {
-                const dist = calculateDistance(currentLat, currentLng, g.cp2.lat, g.cp2.lng);
+                // cp2 または lat/lng を参照
+                const gLat = g.cp2 ? g.cp2.lat : g.lat;
+                const gLng = g.cp2 ? g.cp2.lng : g.lng;
+                const dist = calculateDistance(currentLat, currentLng, gLat, gLng);
                 if (dist < minDistance) {
                     minDistance = dist;
                     nearestGate = g;
                 }
             });
 
-            const gateName = nearestGate ? nearestGate.name : (eventType === 'ENTRY' ? "手動指定ゲート（入構）" : "手動指定ゲート（出講）");
+            const gateName = nearestGate ? nearestGate.name : (eventType === 'ENTRY' ? "手動入構ゲート" : "手動出講ゲート");
             const now = new Date();
 
-            // manualGateAction 関数内での入構時の書き方を以下のように修正・確実にする
             if (eventType === 'ENTRY') {
-                // 車両オブジェクトに直接入構情報を付与
-                v.isInside = true;
-                v.entryGateName = gateName;
-                v.entryTime = now.toISOString();
-
-                // 画面側の現在のアクティブ状態に即座に反映
-                state.activeEntryState.isInside = true;
-                state.activeEntryState.entryGateName = gateName;
-                state.activeEntryState.entryTime = now;
-
-                // 即座にUI要素を更新
-                document.getElementById('gateStatusBadge').innerText = `入構中 (${gateName})`;
-                document.getElementById('gateStatusBadge').className = "text-[11px] px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300";
-                document.getElementById('entryTimeLabel').innerText = now.toLocaleTimeString().slice(0, 5);
-                document.getElementById('lastGateLabel').innerText = gateName;
-
-                showToast(`【手動入構】${gateName} で入構しました`, "success");
+                triggerEntryEvent(vId, gateName, now);
+            } else {
+                triggerExitEvent(vId, gateName, now);
             }
 
             // スプレッドシート側のステータスも即座に更新
