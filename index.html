@@ -859,16 +859,17 @@
         // ストップウォッチ＆インジケーターUI制御（パターンA: MAXで固定）
         function startStopwatchUI() {
             setInterval(() => {
+                // デバッグ用ログ等で activeEntryState を確認できるようにする
                 if (!state.activeEntryState.isInside || !state.activeEntryState.entryTime) {
                     updateStopwatchDisplay(0);
                     updateIndicatorUI(0);
                     return;
                 }
 
-                const maxSec = (state.timerSettings.maxMinutes || 60) * 60;
+                const maxSec = (state.timerSettings && state.timerSettings.maxMinutes ? state.timerSettings.maxMinutes : 60) * 60;
                 let elapsed = Math.floor((new Date() - new Date(state.activeEntryState.entryTime)) / 1000);
 
-                // パターンA: MAX時間を超えないようにカンスト
+                if (elapsed < 0) elapsed = 0;
                 if (elapsed > maxSec) elapsed = maxSec;
 
                 state.activeEntryState.elapsedSeconds = elapsed;
@@ -1741,10 +1742,25 @@
             const gateName = nearestGate ? nearestGate.name : (eventType === 'ENTRY' ? "手動指定ゲート（入構）" : "手動指定ゲート（出講）");
             const now = new Date();
 
+            // manualGateAction 関数内での入構時の書き方を以下のように修正・確実にする
             if (eventType === 'ENTRY') {
-                triggerEntryEvent(vId, gateName, now);
-            } else {
-                triggerExitEvent(vId, gateName, now);
+                // 車両オブジェクトに直接入構情報を付与
+                v.isInside = true;
+                v.entryGateName = gateName;
+                v.entryTime = now.toISOString();
+
+                // 画面側の現在のアクティブ状態に即座に反映
+                state.activeEntryState.isInside = true;
+                state.activeEntryState.entryGateName = gateName;
+                state.activeEntryState.entryTime = now;
+
+                // 即座にUI要素を更新
+                document.getElementById('gateStatusBadge').innerText = `入構中 (${gateName})`;
+                document.getElementById('gateStatusBadge').className = "text-[11px] px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300";
+                document.getElementById('entryTimeLabel').innerText = now.toLocaleTimeString().slice(0, 5);
+                document.getElementById('lastGateLabel').innerText = gateName;
+
+                showToast(`【手動入構】${gateName} で入構しました`, "success");
             }
 
             // スプレッドシート側のステータスも即座に更新
