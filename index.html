@@ -188,8 +188,11 @@
                 </div>
             </div>
 
+            <!-- 地図タブのサイドバー／ドロワー部分 -->
             <div id="vehicleDrawer"
-                class="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col h-48 md:h-full z-10 shadow-lg transition-all duration-300">
+                class="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col h-14 md:h-full z-10 shadow-lg transition-all duration-300 min-h-0">
+
+                <!-- ヘッダー部分（固定表示） -->
                 <div
                     class="p-3 border-b border-slate-200 dark:border-slate-800 font-bold text-xs flex items-center justify-between shrink-0">
                     <span class="flex items-center gap-1.5 text-slate-800 dark:text-slate-100">
@@ -200,13 +203,15 @@
                         <span id="vehicleCountBadge"
                             class="bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300 text-[11px] px-2 py-0.5 rounded-full font-bold">0台</span>
                         <button onclick="toggleVehicleDrawer()"
-                            class="text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                            class="text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition md:hidden"
                             title="リストを開閉">
-                            <span id="drawerToggleIcon" class="material-symbols-outlined text-base">expand_more</span>
+                            <span id="drawerToggleIcon" class="material-symbols-outlined text-base">expand_less</span>
                         </button>
                     </div>
                 </div>
-                <div id="vehicleList" class="flex-1 overflow-y-auto p-2 space-y-2"></div>
+
+                <!-- スクロール可能領域 -->
+                <div id="vehicleList" class="flex-1 overflow-y-auto p-2 space-y-2 min-h-0"></div>
             </div>
         </section>
 
@@ -224,7 +229,7 @@
                     </div>
                     <span id="gateStatusBadge"
                         class="text-[11px] px-2.5 py-1 rounded-full font-bold bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                        構外 (未入構)
+                        未入構
                     </span>
                 </div>
 
@@ -1634,16 +1639,16 @@
             const drawer = document.getElementById('vehicleDrawer');
             const icon = document.getElementById('drawerToggleIcon');
             if (window.innerWidth < 768) {
-                // 現在縮小状態 (h-14) なら全画面・拡大 (h-[75vh] など) に広げる
                 if (drawer.classList.contains('h-14')) {
+                    // 拡大表示：画面高さの60%に設定してスクロール可能に
                     drawer.classList.remove('h-14');
-                    drawer.classList.add('h-[75vh]'); // またはお好みの高さ
-                    icon.innerText = 'expand_more'; // 縮小用アイコンへ
+                    drawer.classList.add('h-[60vh]');
+                    if (icon) icon.innerText = 'expand_more';
                 } else {
-                    // 展開状態なら縮小 (h-14) に戻す
-                    drawer.classList.remove('h-[75vh]', 'h-48', 'h-40');
+                    // 縮小表示：ヘッダーのみ表示
+                    drawer.classList.remove('h-[60vh]', 'h-[75vh]', 'h-48', 'h-40');
                     drawer.classList.add('h-14');
-                    icon.innerText = 'expand_less'; // 拡大用アイコンへ
+                    if (icon) icon.innerText = 'expand_less';
                 }
             }
         }
