@@ -6,6 +6,14 @@
   "app": {
     "theme": "system"
   },
+
+  {
+  "mapBounds": {
+    "southWest": { "lat": 35.14483987810469, "lng": 136.9601096797158 },
+    "northEast": { "lat": 35.160664765103476, "lng": 136.97611710247082 }
+  },
+
+  
   "gateSettings": {
     "defaultRadius": 15,
     "entryGates": [
@@ -49,9 +57,11 @@
       }
     ]
   },
+  
   "timerSettings": {
     "maxMinutes": 10,
     "warningMinutes": 5,
     "dangerMinutes": 8
   }
+  
 }
