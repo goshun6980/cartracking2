@@ -219,50 +219,109 @@
         <section id="view-driver"
             class="hidden w-full h-full overflow-y-auto p-4 md:p-8 max-w-xl mx-auto flex flex-col justify-start gap-4">
 
-            <!-- 入出構時間管理 UI パネル -->
             <div
-                class="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-xl border border-slate-200 dark:border-slate-800 space-y-4">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <span class="material-symbols-outlined text-brand-600 dark:text-brand-400 text-2xl">timer</span>
-                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">入出構時間管理</h3>
+                class="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-xl border border-slate-200 dark:border-slate-800 space-y-4">
+                <div class="flex items-center gap-3">
+                    <div class="p-3 bg-brand-100 text-brand-600 dark:bg-brand-950 dark:text-brand-300 rounded-2xl">
+                        <span class="material-symbols-outlined text-3xl">navigation</span>
                     </div>
-                    <span id="gateStatusBadge"
-                        class="text-[11px] px-2.5 py-1 rounded-full font-bold bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                        未入構
-                    </span>
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">車載端末・位置送信管理</h2>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">位置情報の送信および入出構・滞在時間の管理</p>
+                    </div>
                 </div>
 
-                <div
-                    class="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                    <div>
-                        <span class="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">現在の入構時間</span>
-                        <div class="text-2xl font-mono font-bold text-slate-900 dark:text-slate-100">
-                            <span id="stopwatchHour">00</span>:<span id="stopwatchMin">00</span>:<span
-                                id="stopwatchSec">00</span>
+                <!-- 1. 担当車両を選択プルダウン -->
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs font-bold text-slate-600 dark:text-slate-300">担当車両を選択</label>
+                        <button onclick="fetchVehiclesFromGAS(true)"
+                            class="text-[11px] text-brand-600 dark:text-brand-400 font-bold flex items-center gap-1 hover:underline">
+                            <span class="material-symbols-outlined text-sm" id="driverRefreshIcon">refresh</span>
+                            リスト更新
+                        </button>
+                    </div>
+                    <div class="relative">
+                        <select id="driverVehicleSelect" onchange="onDriverVehicleChange()"
+                            class="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-bold focus:ring-2 focus:ring-brand-500">
+                        </select>
+                        <div id="driverSelectLoader"
+                            class="hidden absolute inset-0 bg-white/95 dark:bg-slate-900/95 rounded-xl z-20 flex items-center justify-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
+                            <span class="material-symbols-outlined animate-spin-custom">sync</span>
+                            スプレッドシートから読み込み中...
                         </div>
                     </div>
-                    <div class="text-right font-mono text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5">
-                        <p>入構時刻: <span id="entryTimeLabel"
-                                class="text-slate-700 dark:text-slate-300 font-bold">--:--</span></p>
-                        <p>無料入構時間: <span id="maxTimeLabel"
-                                class="text-slate-700 dark:text-slate-300 font-bold">45:00</span></p>
+                </div>
+
+                <!-- 2. 同意チェックボックス & 3. 送信開始ボタン -->
+                <div
+                    class="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+                    <label class="flex items-start gap-2.5 cursor-pointer">
+                        <input type="checkbox" id="gpsConsentCheck" onchange="onConsentCheck()"
+                            class="mt-0.5 w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500">
+                        <span class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-bold">
+                            継続的な位置情報送信およびリアルタイム共有に同意します。
+                        </span>
+                    </label>
+
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
+                        <div>
+                            <span class="font-bold text-xs block text-slate-800 dark:text-slate-200">送信ステータス</span>
+                            <span id="driverStatusText" class="text-xs font-bold text-slate-400">未送信 (停止中)</span>
+                        </div>
+                        <button id="toggleGpsBtn" disabled onclick="toggleGpsTracking()"
+                            class="px-5 py-2.5 rounded-xl bg-slate-300 dark:bg-slate-700 text-slate-500 font-bold text-xs shadow transition-all flex items-center gap-1.5 cursor-not-allowed">
+                            <span class="material-symbols-outlined text-lg">play_arrow</span> 送信開始
+                        </button>
                     </div>
                 </div>
 
-                <div class="space-y-1.5">
-                    <div class="flex justify-between text-[11px] font-bold">
-                        <span class="text-slate-600 dark:text-slate-400">滞在許容時間（通常時）</span>
-                        <span id="indicatorText" class="text-slate-500">未計測</span>
+                <!-- 4. 入構時間のストップウオッチ -->
+                <div
+                    class="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1.5">
+                            <span
+                                class="material-symbols-outlined text-brand-600 dark:text-brand-400 text-xl">timer</span>
+                            <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">入構時間・滞在管理</h3>
+                        </div>
+                        <span id="gateStatusBadge"
+                            class="text-[11px] px-2.5 py-1 rounded-full font-bold bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                            構外 (未入構)
+                        </span>
                     </div>
-                    <div class="w-full bg-slate-200 dark:bg-slate-700 h-3 rounded-full overflow-hidden p-0.5">
-                        <div id="indicatorBar" class="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                            style="width: 0%;"></div>
+
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] text-slate-500 dark:text-slate-400 block mb-0.5">現在の経過時間</span>
+                            <div class="text-xl font-mono font-bold text-slate-900 dark:text-slate-100">
+                                <span id="stopwatchHour">00</span>:<span id="stopwatchMin">00</span>:<span
+                                    id="stopwatchSec">00</span>
+                            </div>
+                        </div>
+                        <div class="text-right font-mono text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5">
+                            <p>入構時刻: <span id="entryTimeLabel"
+                                    class="text-slate-700 dark:text-slate-300 font-bold">--:--</span></p>
+                            <p>上限時間: <span id="maxTimeLabel"
+                                    class="text-slate-700 dark:text-slate-300 font-bold">60:00</span></p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-[11px] font-bold">
+                            <span class="text-slate-600 dark:text-slate-400">滞在許容状況</span>
+                            <span id="indicatorText" class="text-slate-500">未計測</span>
+                        </div>
+                        <div class="w-full bg-slate-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden p-0.5">
+                            <div id="indicatorBar"
+                                class="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                                style="width: 0%;"></div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- 位置送信タブ（#view-driver）の「入構・滞在時間管理」パネル内の下部付近に追加 -->
-                <div class="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                <!-- 5. 手動報告のボタン -->
+                <div class="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                     <div class="text-[11px] font-bold text-slate-600 dark:text-slate-400">手動報告</div>
                     <div class="grid grid-cols-2 gap-2">
                         <button onclick="manualGateAction('ENTRY')"
@@ -271,97 +330,36 @@
                         </button>
                         <button onclick="manualGateAction('EXIT')"
                             class="py-2 px-3 bg-slate-600 hover:bg-slate-700 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-1 transition-all active:scale-95">
-                            <span class="material-symbols-outlined text-base">logout</span>出構
+                            <span class="material-symbols-outlined text-base">logout</span>出講
                         </button>
                     </div>
+                    <div
+                        class="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex justify-between items-center pt-1">
+                        <span>直近通過: <span id="lastGateLabel">なし</span></span>
+                    </div>
                 </div>
 
+                <!-- 6. 速度・方位表示 -->
+                <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                    <div class="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-center">
+                        <span class="text-xs text-slate-500 dark:text-slate-400 block mb-1">現在速度</span>
+                        <span id="liveSpeed" class="text-2xl font-bold text-brand-600 dark:text-brand-400">0.0</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400"> km/h</span>
+                    </div>
+                    <div class="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-center">
+                        <span class="text-xs text-slate-500 dark:text-slate-400 block mb-1">移動方向</span>
+                        <span id="liveHeading" class="text-2xl font-bold text-slate-800 dark:text-slate-100">0°</span>
+                        <span id="liveHeadingCardinal" class="text-xs text-slate-500 dark:text-slate-400 block">北</span>
+                    </div>
+                </div>
+
+                <!-- 7. 最終更新と緯度経度 -->
                 <div
-                    class="text-[11px] text-slate-500 dark:text-slate-400 space-y-1 pt-2 border-t border-slate-200 dark:border-slate-800 font-mono flex justify-between items-center">
-                    <span>直近通過: <span id="lastGateLabel">なし</span></span>
-                </div>
-            </div>
-
-            <div
-                class="bg-white dark:bg-slate-900 rounded-2xl p-5 md:p-6 shadow-xl border border-slate-200 dark:border-slate-800 space-y-4">
-                <div class="flex items-center gap-3">
-                    <div class="p-3 bg-brand-100 text-brand-600 dark:bg-brand-950 dark:text-brand-300 rounded-2xl">
-                        <span class="material-symbols-outlined text-3xl">navigation</span>
-                    </div>
-                    <div>
-                        <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">車載端末 位置情報送信</h2>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">リアルタイムの位置情報と速度を送信します</p>
-                    </div>
-                </div>
-
-                <div class="space-y-4">
-                    <div>
-                        <div class="flex justify-between items-center mb-1">
-                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300">担当車両を選択</label>
-                            <button onclick="fetchVehiclesFromGAS(true)"
-                                class="text-[11px] text-brand-600 dark:text-brand-400 font-bold flex items-center gap-1 hover:underline">
-                                <span class="material-symbols-outlined text-sm" id="driverRefreshIcon">refresh</span>
-                                リスト更新
-                            </button>
-                        </div>
-                        <div class="relative">
-                            <select id="driverVehicleSelect" onchange="onDriverVehicleChange()"
-                                class="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-sm font-bold focus:ring-2 focus:ring-brand-500">
-                            </select>
-                            <div id="driverSelectLoader"
-                                class="hidden absolute inset-0 bg-white/95 dark:bg-slate-900/95 rounded-xl z-20 flex items-center justify-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
-                                <span class="material-symbols-outlined animate-spin-custom">sync</span>
-                                スプレッドシートから読み込み中...
-                            </div>
-                        </div>
-                    </div>
-
-                    <div
-                        class="p-4 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-                        <label class="flex items-start gap-2.5 cursor-pointer">
-                            <input type="checkbox" id="gpsConsentCheck" onchange="onConsentCheck()"
-                                class="mt-0.5 w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500">
-                            <span class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-bold">
-                                継続的な位置情報送信およびリアルタイム共有に同意します。
-                            </span>
-                        </label>
-
-                        <div
-                            class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-700">
-                            <div>
-                                <span class="font-bold text-xs block text-slate-800 dark:text-slate-200">送信ステータス</span>
-                                <span id="driverStatusText" class="text-xs font-bold text-slate-400">未送信 (停止中)</span>
-                            </div>
-                            <button id="toggleGpsBtn" disabled onclick="toggleGpsTracking()"
-                                class="px-5 py-2.5 rounded-xl bg-slate-300 dark:bg-slate-700 text-slate-500 font-bold text-xs shadow transition-all flex items-center gap-1.5 cursor-not-allowed">
-                                <span class="material-symbols-outlined text-lg">play_arrow</span> 送信開始
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-center">
-                            <span class="text-xs text-slate-500 dark:text-slate-400 block mb-1">現在速度</span>
-                            <span id="liveSpeed"
-                                class="text-2xl font-bold text-brand-600 dark:text-brand-400">0.0</span>
-                            <span class="text-xs text-slate-500 dark:text-slate-400"> km/h</span>
-                        </div>
-                        <div class="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-center">
-                            <span class="text-xs text-slate-500 dark:text-slate-400 block mb-1">移動方向</span>
-                            <span id="liveHeading"
-                                class="text-2xl font-bold text-slate-800 dark:text-slate-100">0°</span>
-                            <span id="liveHeadingCardinal"
-                                class="text-xs text-slate-500 dark:text-slate-400 block">北</span>
-                        </div>
-                    </div>
-
-                    <div
-                        class="text-xs text-slate-500 dark:text-slate-400 space-y-1 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 font-mono">
-                        <p class="flex justify-between"><span>最終更新:</span> <span id="liveLastUpdate"
-                                class="text-slate-800 dark:text-slate-200">-</span></p>
-                        <p class="flex justify-between"><span>緯度/経度:</span> <span id="liveCoords"
-                                class="text-slate-800 dark:text-slate-200">-</span></p>
-                    </div>
+                    class="text-xs text-slate-500 dark:text-slate-400 space-y-1 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 font-mono">
+                    <p class="flex justify-between"><span>最終更新:</span> <span id="liveLastUpdate"
+                            class="text-slate-800 dark:text-slate-200">-</span></p>
+                    <p class="flex justify-between"><span>緯度/経度:</span> <span id="liveCoords"
+                            class="text-slate-800 dark:text-slate-200">-</span></p>
                 </div>
             </div>
         </section>
