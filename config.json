@@ -59,9 +59,9 @@
   },
   
   "timerSettings": {
-    "maxMinutes": 10,
-    "warningMinutes": 5,
-    "dangerMinutes": 8
+    "maxMinutes": 45,
+    "warningMinutes": 30,
+    "dangerMinutes": 40
   }
   
 }
