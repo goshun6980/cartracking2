@@ -1520,6 +1520,7 @@
             });
         }
 
+        // 修正対象: populateVehicleSelects 関数を以下のように差し替え
         function populateVehicleSelects() {
             const select = document.getElementById('driverVehicleSelect');
             if (!select) return;
@@ -1540,8 +1541,17 @@
                     opt.innerText = `${v.name} (${v.id})${v.driverName ? ' - ' + v.driverName : ''}`;
                     select.appendChild(opt);
                 });
-                if (previousValue && state.vehicles[previousValue]) select.value = previousValue;
+
+                // 以前選択されていたものがあれば維持、なければ先頭の車両をデフォルト選択
+                if (previousValue && state.vehicles[previousValue]) {
+                    select.value = previousValue;
+                } else if (vehiclesArr.length > 0) {
+                    select.value = vehiclesArr[0].id;
+                }
             }
+
+            // 選択された車両の状態を即座にUIへ反映
+            onDriverVehicleChange();
         }
 
         // 修正対象: switchView 関数内
@@ -1757,67 +1767,67 @@
         }
 
         // 最寄りゲートを検索して手動で入構/出講を行う関数（安全装置付き）
-// この安全装置付きのコードになっていれば、モバイルでもデスクトップでもエラーが出ません
-async function manualGateAction(eventType) {
-    const vId = document.getElementById('driverVehicleSelect').value;
-    if (!vId || !state.vehicles[vId]) {
-        showToast("対象の車両を選択してください", "warning");
-        return;
-    }
+        // この安全装置付きのコードになっていれば、モバイルでもデスクトップでもエラーが出ません
+        async function manualGateAction(eventType) {
+            const vId = document.getElementById('driverVehicleSelect').value;
+            if (!vId || !state.vehicles[vId]) {
+                showToast("対象の車両を選択してください", "warning");
+                return;
+            }
 
-    const v = state.vehicles[vId];
-    const currentLat = v.lat || 35.15250;
-    const currentLng = v.lng || 136.96861;
+            const v = state.vehicles[vId];
+            const currentLat = v.lat || 35.15250;
+            const currentLng = v.lng || 136.96861;
 
-    // config.json の読み込み状態に関わらず、安全にデフォルト値へフォールバックします
-    let targetGates = (eventType === 'ENTRY') 
-        ? (state.gateSettings && state.gateSettings.entryGates) 
-        : (state.gateSettings && state.gateSettings.exitGates);
+            // config.json の読み込み状態に関わらず、安全にデフォルト値へフォールバックします
+            let targetGates = (eventType === 'ENTRY')
+                ? (state.gateSettings && state.gateSettings.entryGates)
+                : (state.gateSettings && state.gateSettings.exitGates);
 
-    if (!targetGates || targetGates.length === 0) {
-        if (eventType === 'ENTRY') {
-            targetGates = [
-                { name: "鏡ヶ池ゲート（入構）", cp2: { lat: 35.157390, lng: 136.964198 } },
-                { name: "南部ゲート（入構）", cp2: { lat: 35.153261, lng: 136.963149 } },
-                { name: "東部ゲート（入構）", cp2: { lat: 35.153377, lng: 136.966822 } }
-            ];
-        } else {
-            targetGates = [
-                { name: "東部ゲート（出講）", cp2: { lat: 35.153535, lng: 136.966417 } },
-                { name: "南部ゲート（出講）", cp2: { lat: 35.152891, lng: 136.963047 } },
-                { name: "IBゲート（出講）", cp2: { lat: 35.154448, lng: 136.966293 } }
-            ];
+            if (!targetGates || targetGates.length === 0) {
+                if (eventType === 'ENTRY') {
+                    targetGates = [
+                        { name: "鏡ヶ池ゲート（入構）", cp2: { lat: 35.157390, lng: 136.964198 } },
+                        { name: "南部ゲート（入構）", cp2: { lat: 35.153261, lng: 136.963149 } },
+                        { name: "東部ゲート（入構）", cp2: { lat: 35.153377, lng: 136.966822 } }
+                    ];
+                } else {
+                    targetGates = [
+                        { name: "東部ゲート（出講）", cp2: { lat: 35.153535, lng: 136.966417 } },
+                        { name: "南部ゲート（出講）", cp2: { lat: 35.152891, lng: 136.963047 } },
+                        { name: "IBゲート（出講）", cp2: { lat: 35.154448, lng: 136.966293 } }
+                    ];
+                }
+            }
+
+            let nearestGate = null;
+            let minDistance = Infinity;
+
+            targetGates.forEach(g => {
+                const gLat = g.cp2 ? g.cp2.lat : g.lat;
+                const gLng = g.cp2 ? g.cp2.lng : g.lng;
+                const dist = calculateDistance(currentLat, currentLng, gLat, gLng);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    nearestGate = g;
+                }
+            });
+
+            const gateName = nearestGate ? nearestGate.name : (eventType === 'ENTRY' ? "手動入構ゲート" : "手動出講ゲート");
+            const now = new Date();
+
+            if (eventType === 'ENTRY') {
+                triggerEntryEvent(vId, gateName, now);
+            } else {
+                triggerExitEvent(vId, gateName, now);
+            }
+
+            if (state.gasUrl) {
+                showToast("スプレッドシートへ状態保存中...", "info");
+                await sendGateEventToGAS(vId, eventType, gateName, now);
+                await fetchVehiclesFromGAS(false);
+            }
         }
-    }
-
-    let nearestGate = null;
-    let minDistance = Infinity;
-
-    targetGates.forEach(g => {
-        const gLat = g.cp2 ? g.cp2.lat : g.lat;
-        const gLng = g.cp2 ? g.cp2.lng : g.lng;
-        const dist = calculateDistance(currentLat, currentLng, gLat, gLng);
-        if (dist < minDistance) {
-            minDistance = dist;
-            nearestGate = g;
-        }
-    });
-
-    const gateName = nearestGate ? nearestGate.name : (eventType === 'ENTRY' ? "手動入構ゲート" : "手動出講ゲート");
-    const now = new Date();
-
-    if (eventType === 'ENTRY') {
-        triggerEntryEvent(vId, gateName, now);
-    } else {
-        triggerExitEvent(vId, gateName, now);
-    }
-
-    if (state.gasUrl) {
-        showToast("スプレッドシートへ状態保存中...", "info");
-        await sendGateEventToGAS(vId, eventType, gateName, now);
-        await fetchVehiclesFromGAS(false);
-    }
-}
 
     </script>
 </body>
