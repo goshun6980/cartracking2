@@ -576,6 +576,10 @@
     <script>
         // STATE MANAGEMENT
         let state = {
+
+            mapBounds: null, // 追加
+            gateSettings: { defaultRadius: 15, entryGates: [], exitGates: [] },
+
             adminAuthenticated: false,
             currentView: 'map',
             theme: localStorage.getItem('fleet_theme') || 'system',
@@ -629,6 +633,11 @@
                 if (cfg.gateSettings) state.gateSettings = cfg.gateSettings;
                 if (cfg.timerSettings) state.timerSettings = cfg.timerSettings;
 
+                // --- 【追加】初期マップ境界の設定を読み込み ---
+                if (cfg.mapBounds) {
+                    state.mapBounds = cfg.mapBounds;
+                }
+
                 updateTimerSettingsUI();
                 return cfg;
             } catch (e) {
@@ -674,8 +683,19 @@
             autoFitMapBounds();
         }
 
+        // 修正対象: autoFitMapBounds 関数を以下のように差し替え
         function autoFitMapBounds() {
             if (!map) return;
+
+            // 1. まず config.json に mapBounds が指定されていれば、それを最優先で適用する
+            if (state.mapBounds && state.mapBounds.southWest && state.mapBounds.northEast) {
+                const sw = [state.mapBounds.southWest.lat, state.mapBounds.southWest.lng];
+                const ne = [state.mapBounds.northEast.lat, state.mapBounds.northEast.lng];
+                map.fitBounds(L.latLngBounds(sw, ne), { padding: [20, 20] });
+                return;
+            }
+
+            // 2. 設定がない場合は従来の車両位置に合わせる
             const vehicleList = Object.values(state.vehicles);
             if (vehicleList.length > 0) {
                 const bounds = L.latLngBounds(vehicleList.map(v => [v.lat, v.lng]));
