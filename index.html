@@ -220,7 +220,7 @@
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <span class="material-symbols-outlined text-brand-600 dark:text-brand-400 text-2xl">timer</span>
-                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">入出構時間管理</h3>
+                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">入出講時間管理</h3>
                     </div>
                     <span id="gateStatusBadge"
                         class="text-[11px] px-2.5 py-1 rounded-full font-bold bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
@@ -253,6 +253,21 @@
                     <div class="w-full bg-slate-200 dark:bg-slate-700 h-3 rounded-full overflow-hidden p-0.5">
                         <div id="indicatorBar" class="bg-emerald-500 h-full rounded-full transition-all duration-500"
                             style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <!-- 位置送信タブ（#view-driver）の「入構・滞在時間管理」パネル内の下部付近に追加 -->
+                <div class="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                    <div class="text-[11px] font-bold text-slate-600 dark:text-slate-400">手動報告</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="manualGateAction('ENTRY')"
+                            class="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-1 transition-all active:scale-95">
+                            <span class="material-symbols-outlined text-base">login</span>入構
+                        </button>
+                        <button onclick="manualGateAction('EXIT')"
+                            class="py-2 px-3 bg-slate-600 hover:bg-slate-700 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-1 transition-all active:scale-95">
+                            <span class="material-symbols-outlined text-base">logout</span>出講
+                        </button>
                     </div>
                 </div>
 
@@ -1689,6 +1704,57 @@
                 updateIndicatorUI(0);
             }
         }
+
+        // 最寄りゲートを検索して手動で入構/出講を行う関数
+        async function manualGateAction(eventType) {
+            const vId = document.getElementById('driverVehicleSelect').value;
+            if (!vId || !state.vehicles[vId]) {
+                showToast("対象の車両を選択してください", "warning");
+                return;
+            }
+
+            const v = state.vehicles[vId];
+            const currentLat = v.lat || 35.15250;
+            const currentLng = v.lng || 136.96861;
+
+            // config.json のゲート設定から最寄りのゲートを検索
+            const targetGates = (eventType === 'ENTRY')
+                ? state.gateSettings.entryGates
+                : state.gateSettings.exitGates;
+
+            if (!targetGates || targetGates.length === 0) {
+                showToast("ゲート設定が見つかりません", "warning");
+                return;
+            }
+
+            let nearestGate = null;
+            let minDistance = Infinity;
+
+            targetGates.forEach(g => {
+                const dist = calculateDistance(currentLat, currentLng, g.cp2.lat, g.cp2.lng);
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    nearestGate = g;
+                }
+            });
+
+            const gateName = nearestGate ? nearestGate.name : (eventType === 'ENTRY' ? "手動指定ゲート（入構）" : "手動指定ゲート（出講）");
+            const now = new Date();
+
+            if (eventType === 'ENTRY') {
+                triggerEntryEvent(vId, gateName, now);
+            } else {
+                triggerExitEvent(vId, gateName, now);
+            }
+
+            // スプレッドシート側のステータスも即座に更新
+            if (state.gasUrl) {
+                showToast("スプレッドシートへ状態保存中...", "info");
+                await sendGateEventToGAS(vId, eventType, gateName, now);
+                await fetchVehiclesFromGAS(false);
+            }
+        }
+
     </script>
 </body>
 
