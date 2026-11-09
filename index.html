@@ -932,22 +932,31 @@
             document.getElementById('stopwatchSec').innerText = secs;
         }
 
+        // 修正対象: updateIndicatorUI 関数
         function updateIndicatorUI(elapsedSec) {
             const maxMin = state.timerSettings.maxMinutes || 60;
             const warnMin = state.timerSettings.warningMinutes || 45;
             const dangerMin = state.timerSettings.dangerMinutes || 55;
 
-            const elapsedMin = elapsedSec / 60;
-            const percent = Math.min(100, Math.max(0, (elapsedMin / maxMin) * 100));
-
             const bar = document.getElementById('indicatorBar');
             const text = document.getElementById('indicatorText');
             if (!bar || !text) return;
 
+            // 車両が選択されていない、または入構中でない場合
+            if (!state.activeDriverVehicleId || !state.vehicles[state.activeDriverVehicleId] || !state.activeEntryState.isInside) {
+                bar.style.width = `0%`;
+                bar.className = "bg-slate-300 h-full rounded-full transition-all duration-500";
+                text.innerText = "未計測";
+                text.className = "text-slate-500";
+                return;
+            }
+
             const activeVehicle = state.vehicles[state.activeDriverVehicleId];
             const isInfinite = activeVehicle && activeVehicle.infiniteTime;
+            const elapsedMin = elapsedSec / 60;
+            const percent = Math.min(100, Math.max(0, (elapsedMin / maxMin) * 100));
 
-            // --- 【追加】入構時間無限の場合の処理 ---
+            // 入構時間無限（無制限）に設定されている場合
             if (isInfinite) {
                 bar.style.width = `100%`;
                 bar.className = "bg-brand-500 h-full rounded-full transition-all duration-500";
@@ -958,30 +967,22 @@
 
             bar.style.width = `${percent}%`;
 
-            if (!state.activeEntryState.isInside) {
-                bar.className = "bg-slate-300 h-full rounded-full transition-all duration-500";
-                text.innerText = "未計測";
-                text.className = "text-slate-500";
-                return;
-            }
-
             if (elapsedMin > maxMin) {
-                // --- 【追加】上限超過時の表記 ---
                 const overMin = Math.floor(elapsedMin - maxMin);
                 bar.className = "bg-rose-500 h-full rounded-full transition-all duration-500 animate-pulse";
                 text.innerText = `超過 ${overMin}分`;
                 text.className = "text-rose-600 dark:text-rose-400 font-bold";
             } else if (elapsedMin >= dangerMin) {
                 bar.className = "bg-rose-500 h-full rounded-full transition-all duration-500 animate-pulse";
-                text.innerText = `出講警告 (残り${Math.ceil(maxMin - elapsedMin)}分)`;
+                text.innerText = `出講警告 (残り${Math.max(0, Math.ceil(maxMin - elapsedMin))}分)`;
                 text.className = "text-rose-600 dark:text-rose-400 font-bold";
             } else if (elapsedMin >= warnMin) {
                 bar.className = "bg-amber-500 h-full rounded-full transition-all duration-500";
-                text.innerText = `出講準備 (残り${Math.ceil(maxMin - elapsedMin)}分)`;
+                text.innerText = `出講準備 (残り${Math.max(0, Math.ceil(maxMin - elapsedMin))}分)`;
                 text.className = "text-amber-600 dark:text-amber-400 font-bold";
             } else {
                 bar.className = "bg-emerald-500 h-full rounded-full transition-all duration-500";
-                text.innerText = `余裕あり (残り${Math.ceil(maxMin - elapsedMin)}分)`;
+                text.innerText = `余裕あり (残り${Math.max(0, Math.ceil(maxMin - elapsedMin))}分)`;
                 text.className = "text-emerald-600 dark:text-emerald-400";
             }
         }
@@ -1104,6 +1105,7 @@
         function handleGpsError(err) { showToast(`GPSエラー: ${err.message}`, "warning"); }
 
         // ADMIN MANAGEMENT
+        // 修正対象: attemptAdminLogin 関数
         async function attemptAdminLogin() {
             const pwdInput = document.getElementById('adminPasswordInput').value;
             let adminPassword = "Admin";
@@ -1119,6 +1121,10 @@
             if (pwdInput === adminPassword) {
                 state.adminAuthenticated = true;
                 showAdminPanel();
+
+                // --- 【追加】ログイン成功時にスプレッドシートから最新データを強制取得する ---
+                await fetchVehiclesFromGAS(true);
+
                 showToast("管理者ログインに成功しました", "success");
                 return;
             }
@@ -1897,6 +1903,15 @@
                 await sendGateEventToGAS(vId, eventType, gateName, now);
                 await fetchVehiclesFromGAS(false);
             }
+        }
+
+        // 入構時刻 (entryTime) と 上限時間 (maxMinutes) から出講時刻を計算する例
+        function calculateExitTime(entryTimeStr, maxMinutes) {
+            if (!entryTimeStr) return "--:--";
+            const entryDate = new Date(entryTimeStr);
+            // 入構時刻に上限時間（分）を足す
+            const exitDate = new Date(entryDate.getTime() + (maxMinutes * 60000));
+            return exitDate.toLocaleTimeString().slice(0, 5); // "HH:MM" 形式
         }
 
     </script>
