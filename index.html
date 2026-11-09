@@ -283,11 +283,12 @@
                         <div class="flex items-center gap-1.5">
                             <span
                                 class="material-symbols-outlined text-brand-600 dark:text-brand-400 text-xl">timer</span>
-                            <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">入構時間・滞在管理</h3>
+                            <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">入出構管理</h3>
                         </div>
+                        <!-- ゲート名を廃止し「入構中」のみに固定 -->
                         <span id="gateStatusBadge"
                             class="text-[11px] px-2.5 py-1 rounded-full font-bold bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                            構外 (未入構)
+                            未入構
                         </span>
                     </div>
 
@@ -299,69 +300,63 @@
                                     id="stopwatchSec">00</span>
                             </div>
                         </div>
+                        <!-- 入構時刻、出構時刻、上限時間を表示 -->
                         <div class="text-right font-mono text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5">
                             <p>入構時刻: <span id="entryTimeLabel"
                                     class="text-slate-700 dark:text-slate-300 font-bold">--:--</span></p>
+                            <p>出構時刻: <span id="exitTimeLabel"
+                                    class="text-slate-700 dark:text-slate-300 font-bold">--:--</span></p>
                             <p>上限時間: <span id="maxTimeLabel"
-                                    class="text-slate-700 dark:text-slate-300 font-bold">60:00</span></p>
+                                    class="text-slate-700 dark:text-slate-300 font-bold">--:--</span></p>
                         </div>
                     </div>
 
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-[11px] font-bold">
-                            <span class="text-slate-600 dark:text-slate-400">滞在許容状況</span>
-                            <span id="indicatorText" class="text-slate-500">未計測</span>
-                        </div>
-                        <div class="w-full bg-slate-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden p-0.5">
-                            <div id="indicatorBar"
-                                class="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                                style="width: 0%;"></div>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- 5. 手動報告のボタン -->
-                <div class="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                    <div class="text-[11px] font-bold text-slate-600 dark:text-slate-400">手動報告</div>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button onclick="manualGateAction('ENTRY')"
-                            class="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-1 transition-all active:scale-95">
-                            <span class="material-symbols-outlined text-base">login</span>入構
-                        </button>
-                        <button onclick="manualGateAction('EXIT')"
-                            class="py-2 px-3 bg-slate-600 hover:bg-slate-700 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-1 transition-all active:scale-95">
-                            <span class="material-symbols-outlined text-base">logout</span>出講
-                        </button>
+                    <!-- 5. 手動報告のボタン -->
+                    <div class="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                        <div class="text-[11px] font-bold text-slate-600 dark:text-slate-400">手動報告</div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="manualGateAction('ENTRY')"
+                                class="py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-1 transition-all active:scale-95">
+                                <span class="material-symbols-outlined text-base">login</span>入構
+                            </button>
+                            <button onclick="manualGateAction('EXIT')"
+                                class="py-2 px-3 bg-slate-600 hover:bg-slate-700 text-white font-bold text-xs rounded-xl shadow flex items-center justify-center gap-1 transition-all active:scale-95">
+                                <span class="material-symbols-outlined text-base">logout</span>出講
+                            </button>
+                        </div>
+                        <div
+                            class="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex justify-between items-center pt-1">
+                            <span>直近通過: <span id="lastGateLabel">なし</span></span>
+                        </div>
                     </div>
+
+                    <!-- 6. 速度・方位表示 -->
+                    <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                        <div class="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-center">
+                            <span class="text-xs text-slate-500 dark:text-slate-400 block mb-1">現在速度</span>
+                            <span id="liveSpeed"
+                                class="text-2xl font-bold text-brand-600 dark:text-brand-400">0.0</span>
+                            <span class="text-xs text-slate-500 dark:text-slate-400"> km/h</span>
+                        </div>
+                        <div class="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-center">
+                            <span class="text-xs text-slate-500 dark:text-slate-400 block mb-1">移動方向</span>
+                            <span id="liveHeading"
+                                class="text-2xl font-bold text-slate-800 dark:text-slate-100">0°</span>
+                            <span id="liveHeadingCardinal"
+                                class="text-xs text-slate-500 dark:text-slate-400 block">北</span>
+                        </div>
+                    </div>
+
+                    <!-- 7. 最終更新と緯度経度 -->
                     <div
-                        class="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex justify-between items-center pt-1">
-                        <span>直近通過: <span id="lastGateLabel">なし</span></span>
+                        class="text-xs text-slate-500 dark:text-slate-400 space-y-1 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 font-mono">
+                        <p class="flex justify-between"><span>最終更新:</span> <span id="liveLastUpdate"
+                                class="text-slate-800 dark:text-slate-200">-</span></p>
+                        <p class="flex justify-between"><span>緯度/経度:</span> <span id="liveCoords"
+                                class="text-slate-800 dark:text-slate-200">-</span></p>
                     </div>
                 </div>
-
-                <!-- 6. 速度・方位表示 -->
-                <div class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
-                    <div class="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-center">
-                        <span class="text-xs text-slate-500 dark:text-slate-400 block mb-1">現在速度</span>
-                        <span id="liveSpeed" class="text-2xl font-bold text-brand-600 dark:text-brand-400">0.0</span>
-                        <span class="text-xs text-slate-500 dark:text-slate-400"> km/h</span>
-                    </div>
-                    <div class="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-center">
-                        <span class="text-xs text-slate-500 dark:text-slate-400 block mb-1">移動方向</span>
-                        <span id="liveHeading" class="text-2xl font-bold text-slate-800 dark:text-slate-100">0°</span>
-                        <span id="liveHeadingCardinal" class="text-xs text-slate-500 dark:text-slate-400 block">北</span>
-                    </div>
-                </div>
-
-                <!-- 7. 最終更新と緯度経度 -->
-                <div
-                    class="text-xs text-slate-500 dark:text-slate-400 space-y-1 bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-200 dark:border-slate-800 font-mono">
-                    <p class="flex justify-between"><span>最終更新:</span> <span id="liveLastUpdate"
-                            class="text-slate-800 dark:text-slate-200">-</span></p>
-                    <p class="flex justify-between"><span>緯度/経度:</span> <span id="liveCoords"
-                            class="text-slate-800 dark:text-slate-200">-</span></p>
-                </div>
-            </div>
         </section>
 
         <!-- 3. ADMIN DASHBOARD VIEW -->
@@ -513,13 +508,20 @@
                         class="w-full h-10 p-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 cursor-pointer"
                         value="#6366f1">
                 </div>
+                <div>
+                    <label class="flex items-center gap-2 cursor-pointer mt-2">
+                        <input type="checkbox" id="modalInfiniteTime"
+                            class="w-4 h-4 text-brand-600 rounded border-slate-300">
+                        <span class="text-xs font-bold text-slate-700 dark:text-slate-300">無料入構</span>
+                    </label>
+                </div>
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <button onclick="closeVehicleModal()"
                     class="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold">キャンセル</button>
                 <button id="saveVehicleModalBtn" onclick="saveVehicleModal()"
                     class="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow flex items-center gap-1">
-                    <span>保存してスプシ反映</span>
+                    <span>保存</span>
                 </button>
             </div>
         </div>
@@ -616,6 +618,8 @@
             },
             pendingCP1: {}, // 車両ごとのCP1通過記憶
             stopwatchInterval: null
+
+            //lastGasSendTime: 0
         };
 
         let map, mapMarkers = {}, historyPolyline = null;
@@ -938,8 +942,19 @@
 
             const bar = document.getElementById('indicatorBar');
             const text = document.getElementById('indicatorText');
-
             if (!bar || !text) return;
+
+            const activeVehicle = state.vehicles[state.activeDriverVehicleId];
+            const isInfinite = activeVehicle && activeVehicle.infiniteTime;
+
+            // --- 【追加】入構時間無限の場合の処理 ---
+            if (isInfinite) {
+                bar.style.width = `100%`;
+                bar.className = "bg-brand-500 h-full rounded-full transition-all duration-500";
+                text.innerText = `時間無制限 (経過 ${Math.floor(elapsedMin)}分)`;
+                text.className = "text-brand-600 dark:text-brand-400 font-bold";
+                return;
+            }
 
             bar.style.width = `${percent}%`;
 
@@ -950,22 +965,23 @@
                 return;
             }
 
-            const remainMin = Math.max(0, Math.ceil(maxMin - elapsedMin));
-
-            if (elapsedMin >= dangerMin) {
-                // 危険レベル (赤色・点滅)
+            if (elapsedMin > maxMin) {
+                // --- 【追加】上限超過時の表記 ---
+                const overMin = Math.floor(elapsedMin - maxMin);
                 bar.className = "bg-rose-500 h-full rounded-full transition-all duration-500 animate-pulse";
-                text.innerText = `出構警告 (残り${remainMin}分)`;
+                text.innerText = `超過 ${overMin}分`;
+                text.className = "text-rose-600 dark:text-rose-400 font-bold";
+            } else if (elapsedMin >= dangerMin) {
+                bar.className = "bg-rose-500 h-full rounded-full transition-all duration-500 animate-pulse";
+                text.innerText = `出講警告 (残り${Math.ceil(maxMin - elapsedMin)}分)`;
                 text.className = "text-rose-600 dark:text-rose-400 font-bold";
             } else if (elapsedMin >= warnMin) {
-                // 警告レベル (黄色)
                 bar.className = "bg-amber-500 h-full rounded-full transition-all duration-500";
-                text.innerText = `出構準備 (残り${remainMin}分)`;
+                text.innerText = `出講準備 (残り${Math.ceil(maxMin - elapsedMin)}分)`;
                 text.className = "text-amber-600 dark:text-amber-400 font-bold";
             } else {
-                // 通常レベル (緑色)
                 bar.className = "bg-emerald-500 h-full rounded-full transition-all duration-500";
-                text.innerText = `余裕あり (残り${remainMin}分)`;
+                text.innerText = `余裕あり (残り${Math.ceil(maxMin - elapsedMin)}分)`;
                 text.className = "text-emerald-600 dark:text-emerald-400";
             }
         }
@@ -1043,7 +1059,6 @@
             state.lastPos = { lat: latitude, lng: longitude, time: now };
             const vId = state.activeDriverVehicleId;
 
-            // ゲート通過チェック実行
             evaluateGatePassage(latitude, longitude, vId);
 
             if (state.vehicles[vId]) {
@@ -1065,7 +1080,16 @@
                 };
 
                 state.historyLogs.push(logItem);
-                sendPositionToGAS(logItem, vId);
+
+                // --- 【追加】速度に応じた送信タイミングの制御 ---
+                const nowTime = now.getTime();
+                const requiredInterval = (calcSpeed >= 5) ? 30000 : 180000; // 5km/h以上なら30秒、未満なら3分
+                if (!state.lastGasSendTime) state.lastGasSendTime = 0;
+
+                if (nowTime - state.lastGasSendTime >= requiredInterval) {
+                    sendPositionToGAS(logItem, vId);
+                    state.lastGasSendTime = nowTime;
+                }
             }
 
             document.getElementById('liveSpeed').innerText = calcSpeed.toFixed(1);
@@ -1119,6 +1143,7 @@
             editingVehicleId = id;
             document.getElementById('duplicateWarning').classList.add('hidden');
             document.getElementById('saveVehicleModalBtn').disabled = false;
+            document.getElementById('modalInfiniteTime').checked = v.infiniteTime || false;
 
             if (id && state.vehicles[id]) {
                 const v = state.vehicles[id];
@@ -1173,8 +1198,23 @@
             }
 
             let v = editingVehicleId && state.vehicles[editingVehicleId]
-                ? { ...state.vehicles[editingVehicleId], name, driverName, color }
-                : { id: vId, name, driverName, color, lat: 35.15250, lng: 136.96861, speed: 0, heading: 0, online: false, isInside: false, entryGateName: "", entryTime: null, lastUpdated: new Date().toISOString() };
+                ? { ...state.vehicles[editingVehicleId], name, driverName, color, infiniteTime: document.getElementById('modalInfiniteTime').checked }
+                : {
+                    id: vId,
+                    name,
+                    driverName,
+                    color,
+                    infiniteTime: document.getElementById('modalInfiniteTime').checked, // ← ここに追加
+                    lat: 35.15250,
+                    lng: 136.96861,
+                    speed: 0,
+                    heading: 0,
+                    online: false,
+                    isInside: false,
+                    entryGateName: "",
+                    entryTime: null,
+                    lastUpdated: new Date().toISOString()
+                };
 
             if (editingVehicleId) v.id = editingVehicleId;
 
@@ -1364,14 +1404,14 @@
             setInterval(() => {
                 if (state.gasUrl && !state.isLoadingVehicles) fetchVehiclesFromGAS(false);
                 evaluateSyncHealth();
-            }, state.isTracking ? 30000 : (state.currentView === 'map' ? 60000 : 30000));
+            }, 180000); // 1分(60000)から3分(180000)に変更
         }
 
         async function triggerManualReload() {
-            if (state.reloadCooldown > 0 || state.isLoadingVehicles) return;
+            if (state.isLoadingVehicles) return;
             try {
                 await fetchVehiclesFromGAS(true);
-                startCooldown(state.isTracking ? 30 : 60);
+                showToast("最新データを取得しました", "success");
             } catch (e) { }
         }
 
@@ -1527,6 +1567,10 @@
                 return;
             }
 
+            const elapsedStr = (v.isInside && v.entryTime)
+                ? ` (${Math.floor((new Date() - new Date(v.entryTime)) / 60000)}分経過)`
+                : '';
+
             vehiclesArr.forEach(v => {
                 const colorHex = v.color || '#6366f1';
                 const row = document.createElement('tr');
@@ -1540,7 +1584,7 @@
                         </td>
                         <td class="p-3">
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${v.isInside ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}">
-                                ${v.isInside ? '構内' : '構外'}
+                                ${v.isInside ? '構内' : '構外'}${elapsedStr}
                             </span>
                         </td>
                         <td class="p-3">
