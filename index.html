@@ -1764,7 +1764,7 @@
                 return;
             }
 
-if (v.isInside && v.entryTime) {
+            if (v.isInside && v.entryTime) {
                 const entryDate = new Date(v.entryTime);
                 state.activeEntryState.isInside = true;
                 state.activeEntryState.entryGateName = v.entryGateName || '入構中';
@@ -1781,7 +1781,8 @@ if (v.isInside && v.entryTime) {
                     badge.className = "text-[11px] px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300";
                 }
                 if (entryLabel) entryLabel.innerText = entryDate.toLocaleTimeString().slice(0, 5);
-                
+
+                // ★ 無料入構の場合は切り替え時にも "--:--" に設定
                 if (v.infiniteTime) {
                     if (exitLabel) exitLabel.innerText = "--:--";
                     if (maxLabel) maxLabel.innerText = "--:--";
