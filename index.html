@@ -517,7 +517,7 @@
                     <label class="flex items-center gap-2 cursor-pointer mt-2">
                         <input type="checkbox" id="modalInfiniteTime"
                             class="w-4 h-4 text-brand-600 rounded border-slate-300">
-                        <span class="text-xs font-bold text-slate-700 dark:text-slate-300">入構時間無限（無制限）にする</span>
+                        <span class="text-xs font-bold text-slate-700 dark:text-slate-300">無料入構</span>
                     </label>
                 </div>
             </div>
@@ -1139,7 +1139,7 @@
                 document.getElementById('modalVehicleName').value = v.name;
                 document.getElementById('modalDriverName').value = v.driverName || '';
                 document.getElementById('modalVehicleColor').value = v.color || "#6366f1";
-                document.getElementById('modalInfiniteTime').checked = v.infiniteTime || false;
+                document.getElementById('modalInfiniteTime').checked = v.infiniteTime || false; // ★追加
             } else {
                 document.getElementById('vehicleModalTitle').innerText = "新規車両追加";
                 document.getElementById('modalVehicleId').value = `CAR-00${Object.keys(state.vehicles).length + 1}`;
@@ -1147,7 +1147,7 @@
                 document.getElementById('modalVehicleName').value = "";
                 document.getElementById('modalDriverName').value = "";
                 document.getElementById('modalVehicleColor').value = "#6366f1";
-                document.getElementById('modalInfiniteTime').checked = false;
+                document.getElementById('modalInfiniteTime').checked = false; // ★追加
                 validateVehicleIdDuplicate();
             }
             document.getElementById('vehicleModal').classList.remove('hidden');
@@ -1177,7 +1177,7 @@
             const name = document.getElementById('modalVehicleName').value.trim();
             const driverName = document.getElementById('modalDriverName').value.trim();
             const color = document.getElementById('modalVehicleColor').value;
-            const infiniteTime = document.getElementById('modalInfiniteTime').checked;
+            const infiniteTime = document.getElementById('modalInfiniteTime').checked; // ★追加
 
             if (!vId || !name) { showToast('車両IDと名前を入力してください', 'warning'); return; }
 
@@ -1186,6 +1186,7 @@
                 return;
             }
 
+            // ★ v オブジェクトに infiniteTime を含める
             let v = editingVehicleId && state.vehicles[editingVehicleId]
                 ? { ...state.vehicles[editingVehicleId], name, driverName, color, infiniteTime }
                 : { id: vId, name, driverName, color, infiniteTime, lat: 35.15250, lng: 136.96861, speed: 0, heading: 0, online: false, isInside: false, entryGateName: "", entryTime: null, lastUpdated: new Date().toISOString() };
@@ -1211,7 +1212,6 @@
                 showToast('車両情報の保存に失敗しました。', 'warning');
             }
         }
-
         async function deleteVehicle(id) {
             if (!confirm(`車両 [ ${id} ] をスプレッドシートから削除しますか？`)) return;
 
@@ -1525,13 +1525,18 @@
                     ? ` (${Math.floor((new Date() - new Date(v.entryTime)) / 60000)}分経過)`
                     : '';
 
+                // ★ 無料入構バッジの定義
+                const infiniteBadge = v.infiniteTime
+                    ? `<span class="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">無料入構</span>`
+                    : '';
+
                 const row = document.createElement('tr');
                 row.className = "hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors";
                 row.innerHTML = `
                     <td class="p-3"><span class="w-4 h-4 rounded-full inline-block align-middle border border-slate-300 dark:border-slate-700" style="background-color: ${colorHex}"></span></td>
                     <td class="p-3 font-mono font-bold text-brand-600 dark:text-brand-400">${v.id}</td>
                     <td class="p-3 font-bold">
-                        <div>${v.name}</div>
+                        <div>${v.name} ${infiniteBadge}</div>
                         <div class="text-[11px] font-normal text-slate-500">${v.driverName ? '乗務者: ' + v.driverName : 'ドライバー未設定'}</div>
                     </td>
                     <td class="p-3">
@@ -1554,7 +1559,6 @@
                 adminBody.appendChild(row);
             });
         }
-
         function populateVehicleSelects() {
             const select = document.getElementById('driverVehicleSelect');
             if (!select) return;
