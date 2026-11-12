@@ -886,28 +886,42 @@
 
         function startStopwatchUI() {
             setInterval(() => {
+                const exitElem = document.getElementById('exitTimeLabel');
+                const maxLabel = document.getElementById('maxTimeLabel');
+
+                // 現在選択されている車両が「無料入構」かどうかを判定
+                const activeVehicle = state.vehicles[state.activeDriverVehicleId] || state.vehicles[document.getElementById('driverVehicleSelect').value];
+                const isInfinite = activeVehicle && activeVehicle.infiniteTime;
+
                 if (!state.activeEntryState.isInside || !state.activeEntryState.entryTime) {
                     updateStopwatchDisplay(0);
                     updateIndicatorUI(0);
-                    const exitElem = document.getElementById('exitTimeLabel');
-                    if (exitElem && !state.activeEntryState.isInside) exitElem.innerText = "--:--";
+                    if (exitElem) exitElem.innerText = "--:--";
+                    if (maxLabel && isInfinite) maxLabel.innerText = "--:--";
                     return;
                 }
 
-                const maxMin = (state.timerSettings && state.timerSettings.maxMinutes) ? state.timerSettings.maxMinutes : 60;
+                // ★ 無料入構の場合は上限時間と出構時刻を "--:--" にする
+                if (isInfinite) {
+                    if (exitElem) exitElem.innerText = "--:--";
+                    if (maxLabel) maxLabel.innerText = "--:--";
+                } else {
+                    const maxMin = (state.timerSettings && state.timerSettings.maxMinutes) ? state.timerSettings.maxMinutes : 60;
+                    if (maxLabel) maxLabel.innerText = `${maxMin}:00`;
+
+                    const entryDate = new Date(state.activeEntryState.entryTime);
+                    const exitDate = new Date(entryDate.getTime() + (maxMin * 60000));
+                    if (exitElem) {
+                        exitElem.innerText = exitDate.toLocaleTimeString().slice(0, 5);
+                    }
+                }
+
                 let elapsed = Math.floor((new Date() - new Date(state.activeEntryState.entryTime)) / 1000);
                 if (elapsed < 0) elapsed = 0;
 
                 state.activeEntryState.elapsedSeconds = elapsed;
                 updateStopwatchDisplay(elapsed);
                 updateIndicatorUI(elapsed);
-
-                const entryDate = new Date(state.activeEntryState.entryTime);
-                const exitDate = new Date(entryDate.getTime() + (maxMin * 60000));
-                const exitElem = document.getElementById('exitTimeLabel');
-                if (exitElem) {
-                    exitElem.innerText = exitDate.toLocaleTimeString().slice(0, 5);
-                }
             }, 1000);
         }
 
@@ -1750,7 +1764,7 @@
                 return;
             }
 
-            if (v.isInside && v.entryTime) {
+if (v.isInside && v.entryTime) {
                 const entryDate = new Date(v.entryTime);
                 state.activeEntryState.isInside = true;
                 state.activeEntryState.entryGateName = v.entryGateName || '入構中';
@@ -1758,6 +1772,8 @@
 
                 const badge = document.getElementById('gateStatusBadge');
                 const entryLabel = document.getElementById('entryTimeLabel');
+                const exitLabel = document.getElementById('exitTimeLabel');
+                const maxLabel = document.getElementById('maxTimeLabel');
                 const lastGateLabel = document.getElementById('lastGateLabel');
 
                 if (badge) {
@@ -1765,9 +1781,13 @@
                     badge.className = "text-[11px] px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300";
                 }
                 if (entryLabel) entryLabel.innerText = entryDate.toLocaleTimeString().slice(0, 5);
+                
+                if (v.infiniteTime) {
+                    if (exitLabel) exitLabel.innerText = "--:--";
+                    if (maxLabel) maxLabel.innerText = "--:--";
+                }
+
                 if (lastGateLabel) lastGateLabel.innerText = v.entryGateName || '入構中';
-            } else {
-                resetDriverGateUI();
             }
         }
 
