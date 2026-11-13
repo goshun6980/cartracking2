@@ -1412,6 +1412,7 @@
                 vehiclesArr.forEach(v => {
                     const colorHex = v.color || '#6366f1';
                     const speedNum = Number(v.speed) || 0;
+                    const iconName = v.iconType || 'airport_shuttle'; // ★ここで iconName を定義する
 
                     // 車両名横に表示する無料入構バッジ
                     const infiniteBadge = v.infiniteTime
@@ -1451,40 +1452,40 @@
                         }
 
                         timeInfoHtml = `
-            <div class="mt-1 pt-1 border-t border-slate-200 dark:border-slate-700 space-y-1">
-                <div class="flex justify-between text-[10px] ${statusTextColor}">
-                    <span>入構: ${entryTimeStr}</span>
-                    <span>${statusText}</span>
-                </div>
-                <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                    <div class="${barColor} h-full rounded-full transition-all duration-500" style="width: ${barWidth}%;"></div>
-                </div>
-            </div>
-        `;
+                            <div class="mt-1 pt-1 border-t border-slate-200 dark:border-slate-700 space-y-1">
+                                <div class="flex justify-between text-[10px] ${statusTextColor}">
+                                    <span>入構: ${entryTimeStr}</span>
+                                    <span>${statusText}</span>
+                                </div>
+                                <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                                    <div class="${barColor} h-full rounded-full transition-all duration-500" style="width: ${barWidth}%;"></div>
+                                </div>
+                            </div>
+                        `;
                     }
 
                     const item = document.createElement('div');
                     item.className = "p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 hover:border-brand-500 cursor-pointer transition-all";
                     item.onclick = () => focusOnVehicle(v.id);
                     item.innerHTML = `
-    <div class="flex items-center justify-between mb-1">
-        <span class="font-bold text-xs flex items-center gap-1.5 text-slate-800 dark:text-slate-100">
-            <span class="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style="background-color: ${colorHex}">
-                <span class="material-symbols-outlined text-sm">${iconName}</span>
-            </span>
-            ${v.name}
-            ${infiniteBadge}
-        </span>
-        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${v.isInside ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}">
-            ${v.isInside ? '構内' : '構外'}
-        </span>
-    </div>
-        <div class="text-[11px] text-slate-500 dark:text-slate-400 flex justify-between font-mono">
-            <span>速度: ${speedNum.toFixed(1)} km/h</span>
-            <span>${formatTimeAgo(v.lastUpdated)}</span>
-        </div>
-        ${timeInfoHtml}
-    `;
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="font-bold text-xs flex items-center gap-1.5 text-slate-800 dark:text-slate-100">
+                                <span class="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style="background-color: ${colorHex}">
+                                    <span class="material-symbols-outlined text-sm">${iconName}</span>
+                                </span>
+                                ${v.name}
+                                ${infiniteBadge}
+                            </span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${v.isInside ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}">
+                                ${v.isInside ? '構内' : '構外'}
+                            </span>
+                        </div>
+                        <div class="text-[11px] text-slate-500 dark:text-slate-400 flex justify-between font-mono">
+                            <span>速度: ${speedNum.toFixed(1)} km/h</span>
+                            <span>${formatTimeAgo(v.lastUpdated)}</span>
+                        </div>
+                        ${timeInfoHtml}
+                    `;
                     listContainer.appendChild(item);
                 });
             }
