@@ -119,6 +119,8 @@
                     class="relative p-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="データを再読み込み">
                     <span id="global-reload-icon" class="material-symbols-outlined text-xl">refresh</span>
+                    <span id="reloadCountdown"
+                        class="absolute inset-0 flex items-center justify-center text-[6px] font-normal"></span>
                 </button>
             </div>
         </div>
@@ -164,6 +166,26 @@
         <section id="view-map" class="w-full h-full flex flex-col md:flex-row flex-1 relative">
             <div class="flex-1 relative h-full w-full">
                 <div id="leafletMap" class="w-full h-full z-0"></div>
+                <div id="osmInfoBanner"
+                    class="absolute top-3 left-3 right-3 md:left-3 md:right-auto md:max-w-md bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-3 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 z-10 text-xs transition-opacity duration-1000">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex gap-2">
+                            <span class="material-symbols-outlined text-amber-500 text-lg shrink-0">info</span>
+                            <div>
+                                <strong class="text-slate-900 dark:text-slate-100 font-bold block mb-0.5">OSM
+                                    使用ガイド</strong>
+                                <p class="text-slate-600 dark:text-slate-300 leading-relaxed text-[11px]">
+                                    OpenStreetMap (OSM) を標準使用しています。この通知はあと <span id="osmTimer"
+                                        class="font-bold text-brand-600 dark:text-brand-400">10</span> 秒で自動消滅します。
+                                </p>
+                            </div>
+                        </div>
+                        <button onclick="dismissOsmBanner()"
+                            class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                            <span class="material-symbols-outlined text-base">close</span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- 地図タブのサイドバー／ドロワー部分 -->
@@ -265,7 +287,7 @@
                         </div>
                         <span id="gateStatusBadge"
                             class="text-[11px] px-2.5 py-1 rounded-full font-bold bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                            未入構
+                            構外 (未入構)
                         </span>
                     </div>
 
@@ -279,8 +301,6 @@
                         </div>
                         <div class="text-right font-mono text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5">
                             <p>入構時刻: <span id="entryTimeLabel"
-                                    class="text-slate-700 dark:text-slate-300 font-bold">--:--</span></p>
-                            <p>出構時刻: <span id="exitTimeLabel"
                                     class="text-slate-700 dark:text-slate-300 font-bold">--:--</span></p>
                             <p>上限時間: <span id="maxTimeLabel"
                                     class="text-slate-700 dark:text-slate-300 font-bold">60:00</span></p>
@@ -493,21 +513,6 @@
                         class="w-full h-10 p-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 cursor-pointer"
                         value="#6366f1">
                 </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">車両アイコン</label>
-                    <select id="modalVehicleIcon"
-                        class="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-xs font-bold">
-                        <option value="airport_shuttle">ハイエース</option>
-                        <option value="local_shipping">トラック</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="flex items-center gap-2 cursor-pointer mt-2">
-                        <input type="checkbox" id="modalInfiniteTime"
-                            class="w-4 h-4 text-brand-600 rounded border-slate-300">
-                        <span class="text-xs font-bold text-slate-700 dark:text-slate-300">無料入構</span>
-                    </label>
-                </div>
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <button onclick="closeVehicleModal()"
@@ -571,7 +576,8 @@
     <script>
         // STATE MANAGEMENT
         let state = {
-            mapBounds: null,
+
+            mapBounds: null, // 追加
             gateSettings: { defaultRadius: 15, entryGates: [], exitGates: [] },
 
             adminAuthenticated: false,
@@ -588,15 +594,18 @@
             isTracking: false,
             activeDriverVehicleId: "",
             lastPos: null,
-            lastGasSendTime: 0,
 
             // Sync Health
             lastNetworkCommunication: null,
             isCurrentlyOffline: false,
 
+            // Manual Reload CoolDown state
+            reloadCooldown: 0,
+            cooldownTimer: null,
             osmTimerSeconds: 10,
 
             // Gate & Entry Tracking State
+            gateSettings: { defaultRadius: 15, entryGates: [], exitGates: [] },
             timerSettings: { maxMinutes: 60, warningMinutes: 45, dangerMinutes: 55 },
             activeEntryState: {
                 isInside: false,
@@ -605,7 +614,7 @@
                 elapsedSeconds: 0,
                 lastGateName: ""
             },
-            pendingCP1: {},
+            pendingCP1: {}, // 車両ごとのCP1通過記憶
             stopwatchInterval: null
         };
 
@@ -624,6 +633,7 @@
                 if (cfg.gateSettings) state.gateSettings = cfg.gateSettings;
                 if (cfg.timerSettings) state.timerSettings = cfg.timerSettings;
 
+                // --- 【追加】初期マップ境界の設定を読み込み ---
                 if (cfg.mapBounds) {
                     state.mapBounds = cfg.mapBounds;
                 }
@@ -636,6 +646,17 @@
             }
         }
 
+        window.onload = async function () {
+            await loadGitHubConfig();
+            parseUrlParameters();
+            initTheme();
+            initLeafletMap();
+            initOsmTimer();
+            await fetchVehiclesFromGAS();
+            fetchHistoryFromGAS();
+            startFastPolling();
+            startStopwatchUI();
+        };
 
         function parseUrlParameters() {
             const params = new URLSearchParams(window.location.search);
@@ -651,18 +672,22 @@
             if (maxLabel) maxLabel.innerText = `${state.timerSettings.maxMinutes}:00`;
         }
 
+        // initLeafletMap関数内を確認し、L.control.scaleが複数回呼ばれていないか確認してください
         function initLeafletMap() {
-            if (map) return;
+            if (map) return; // 既に初期化済みの場合は二重作成しない
             map = L.map('leafletMap', { zoomControl: true, attributionControl: true }).setView([35.15250, 136.96861], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
 
+            // スケールコントロールの重複を防ぐため、既に存在しない場合のみ追加
             L.control.scale({ imperial: false, metric: true, position: 'bottomleft' }).addTo(map);
             autoFitMapBounds();
         }
 
+        // 修正対象: autoFitMapBounds 関数を以下のように差し替え
         function autoFitMapBounds() {
             if (!map) return;
 
+            // 1. まず config.json に mapBounds が指定されていれば、それを最優先で適用する
             if (state.mapBounds && state.mapBounds.southWest && state.mapBounds.northEast) {
                 const sw = [state.mapBounds.southWest.lat, state.mapBounds.southWest.lng];
                 const ne = [state.mapBounds.northEast.lat, state.mapBounds.northEast.lng];
@@ -670,6 +695,7 @@
                 return;
             }
 
+            // 2. 設定がない場合は従来の車両位置に合わせる
             const vehicleList = Object.values(state.vehicles);
             if (vehicleList.length > 0) {
                 const bounds = L.latLngBounds(vehicleList.map(v => [v.lat, v.lng]));
@@ -689,31 +715,30 @@
             Object.values(state.vehicles).forEach(v => {
                 const colorHex = v.color || '#6366f1';
                 const statusStr = v.isInside ? `【構内】${v.entryGateName || '入構中'}` : '構外';
-                const iconName = v.iconType || 'airport_shuttle'; // 選択されたアイコン
 
                 if (!mapMarkers[v.id]) {
                     const svgIcon = L.divIcon({
                         className: 'custom-vehicle-marker',
                         html: `
-                    <div style="transform: rotate(${v.heading || 0}deg);" class="transition-transform duration-300">
-                        <div style="background-color: ${colorHex};" class="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-lg border-2 border-white dark:border-slate-900">
-                            <span class="material-symbols-outlined text-base">${iconName}</span>
-                        </div>
-                    </div>
-                `,
+                                <div style="transform: rotate(${v.heading || 0}deg);" class="transition-transform duration-300">
+                                    <div style="background-color: ${colorHex};" class="w-8 h-8 rounded-full flex items-center justify-center text-white shadow-lg border-2 border-white dark:border-slate-900">
+                                        <span class="material-symbols-outlined text-lg">navigation</span>
+                                    </div>
+                                </div>
+                            `,
                         iconSize: [32, 32],
                         iconAnchor: [16, 16]
                     });
 
                     const marker = L.marker([v.lat, v.lng], { icon: svgIcon }).addTo(map);
                     marker.bindPopup(`
-                <div class="text-xs p-1 font-sans">
-                    <strong style="color: ${colorHex}">${v.name}</strong> (${v.id})<br>
-                    状態: ${statusStr}<br>
-                    速度: ${Number(v.speed).toFixed(1)} km/h<br>
-                    更新: ${formatTimeAgo(v.lastUpdated)}
-                </div>
-            `);
+                            <div class="text-xs p-1 font-sans">
+                                <strong style="color: ${colorHex}">${v.name}</strong> (${v.id})<br>
+                                状態: ${statusStr}<br>
+                                速度: ${Number(v.speed).toFixed(1)} km/h<br>
+                                更新: ${formatTimeAgo(v.lastUpdated)}
+                            </div>
+                        `);
                     mapMarkers[v.id] = marker;
                 } else {
                     mapMarkers[v.id].setLatLng([v.lat, v.lng]);
@@ -723,21 +748,31 @@
                         if (rotInner) rotInner.style.transform = `rotate(${v.heading || 0}deg)`;
                         const circle = iconElem.querySelector('.w-8');
                         if (circle) circle.style.backgroundColor = colorHex;
-                        // アイコンの動的差し替え
-                        const spanElem = iconElem.querySelector('.material-symbols-outlined');
-                        if (spanElem) spanElem.innerText = iconName;
                     }
                     mapMarkers[v.id].getPopup().setContent(`
-                <div class="text-xs p-1 font-sans">
-                    <strong style="color: ${colorHex}">${v.name}</strong> (${v.id})<br>
-                    状態: ${statusStr}<br>
-                    速度: ${Number(v.speed).toFixed(1)} km/h<br>
-                    更新: ${formatTimeAgo(v.lastUpdated)}
-                </div>
-            `);
+                            <div class="text-xs p-1 font-sans">
+                                <strong style="color: ${colorHex}">${v.name}</strong> (${v.id})<br>
+                                状態: ${statusStr}<br>
+                                速度: ${Number(v.speed).toFixed(1)} km/h<br>
+                                更新: ${formatTimeAgo(v.lastUpdated)}
+                            </div>
+                        `);
                 }
             });
         }
+
+        function initOsmTimer() {
+            const timerElem = document.getElementById('osmTimer');
+            const interval = setInterval(() => {
+                state.osmTimerSeconds--;
+                if (timerElem) timerElem.innerText = state.osmTimerSeconds;
+                if (state.osmTimerSeconds <= 0) {
+                    clearInterval(interval);
+                    dismissOsmBanner();
+                }
+            }, 1000);
+        }
+
         function dismissOsmBanner() {
             const banner = document.getElementById('osmInfoBanner');
             if (banner) {
@@ -746,12 +781,14 @@
             }
         }
 
+        // ゲート通過（CP1 ➔ CP2）判定ロジック
         function evaluateGatePassage(lat, lng, vehicleId) {
             const radius = state.gateSettings.defaultRadius || 15;
             const now = new Date();
 
             if (!state.pendingCP1[vehicleId]) state.pendingCP1[vehicleId] = {};
 
+            // A入構ゲートの判定
             state.gateSettings.entryGates.forEach(gate => {
                 const distCP1 = calculateDistance(lat, lng, gate.cp1.lat, gate.cp1.lng);
                 const distCP2 = calculateDistance(lat, lng, gate.cp2.lat, gate.cp2.lng);
@@ -762,6 +799,7 @@
 
                 if (distCP2 <= radius) {
                     const cp1Time = state.pendingCP1[vehicleId][gate.id];
+                    // 過去60秒以内にCP1を通過していれば「入構確定」
                     if (cp1Time && (now.getTime() - cp1Time) <= 60000) {
                         delete state.pendingCP1[vehicleId][gate.id];
                         triggerEntryEvent(vehicleId, gate.name, now);
@@ -769,6 +807,7 @@
                 }
             });
 
+            // B出構ゲートの判定
             state.gateSettings.exitGates.forEach(gate => {
                 const distCP1 = calculateDistance(lat, lng, gate.cp1.lat, gate.cp1.lng);
                 const distCP2 = calculateDistance(lat, lng, gate.cp2.lat, gate.cp2.lng);
@@ -779,6 +818,7 @@
 
                 if (distCP2 <= radius) {
                     const cp1Time = state.pendingCP1[vehicleId][gate.id];
+                    // 過去60秒以内にCP1を通過していれば「出構確定」
                     if (cp1Time && (now.getTime() - cp1Time) <= 60000) {
                         delete state.pendingCP1[vehicleId][gate.id];
                         triggerExitEvent(vehicleId, gate.name, now);
@@ -787,9 +827,10 @@
             });
         }
 
+        // 入構処理
         function triggerEntryEvent(vehicleId, gateName, timestamp) {
             const v = state.vehicles[vehicleId];
-            if (v && v.isInside) return;
+            if (v && v.isInside) return; // 既に入構中なら重複スキップ
 
             if (v) {
                 v.isInside = true;
@@ -813,20 +854,23 @@
             sendGateEventToGAS(vehicleId, 'ENTRY', gateName, timestamp);
         }
 
+        // 修正対象: triggerExitEvent 関数を探して以下のように差し替えてください
         function triggerExitEvent(vehicleId, gateName, timestamp) {
             const v = state.vehicles[vehicleId];
             if (v) {
                 v.isInside = false;
                 v.entryGateName = "";
-                v.entryTime = null;
+                v.entryTime = null; // 入構時刻をクリア
             }
 
+            // 操作中の車両が現在ドライバー画面で選択されている車両であれば、即座に画面をリセット
             if (vehicleId === document.getElementById('driverVehicleSelect').value) {
                 state.activeEntryState.isInside = false;
                 state.activeEntryState.entryGateName = "";
                 state.activeEntryState.entryTime = null;
                 state.activeEntryState.elapsedSeconds = 0;
 
+                // 画面のステータスバッジを「構外」に変更
                 const badge = document.getElementById('gateStatusBadge');
                 if (badge) {
                     badge.innerText = "構外 (出構完了)";
@@ -836,54 +880,36 @@
                 const entryTimeLbl = document.getElementById('entryTimeLabel');
                 if (entryTimeLbl) entryTimeLbl.innerText = "--:--";
 
-                const exitTimeLbl = document.getElementById('exitTimeLabel');
-                if (exitTimeLbl) exitTimeLbl.innerText = "--:--";
-
                 const lastGateLbl = document.getElementById('lastGateLabel');
                 if (lastGateLbl) lastGateLbl.innerText = gateName;
 
+                // ストップウオッチとインジケーターを強制リセット
                 updateStopwatchDisplay(0);
                 updateIndicatorUI(0);
 
                 showToast(`【出構検知】${gateName} を通過しました`, "info");
             }
 
+            // 車両リストやマップ上の表示も更新
             refreshLocalUI();
+
+            // スプレッドシートへイベント記録
             sendGateEventToGAS(vehicleId, 'EXIT', gateName, timestamp);
         }
 
+        // ストップウォッチ＆インジケーターUI制御（パターンA: MAXで固定）
         function startStopwatchUI() {
             setInterval(() => {
-                const exitElem = document.getElementById('exitTimeLabel');
-                const maxLabel = document.getElementById('maxTimeLabel');
-                const selectedId = document.getElementById('driverVehicleSelect')?.value || state.activeDriverVehicleId;
-                const activeVehicle = state.vehicles[selectedId];
-                const isInfinite = activeVehicle && activeVehicle.infiniteTime; // 先に定義
-
+                // デバッグ用ログ等で activeEntryState を確認できるようにする
                 if (!state.activeEntryState.isInside || !state.activeEntryState.entryTime) {
                     updateStopwatchDisplay(0);
                     updateIndicatorUI(0);
-                    if (exitElem) exitElem.innerText = "--:--";
-                    if (maxLabel && isInfinite) maxLabel.innerText = "--:--";
                     return;
                 }
 
-                // ★ 無料入構の場合は上限時間と出構時刻を "--:--" にする
-                if (isInfinite) {
-                    if (exitElem) exitElem.innerText = "--:--";
-                    if (maxLabel) maxLabel.innerText = "--:--";
-                } else {
-                    const maxMin = (state.timerSettings && state.timerSettings.maxMinutes) ? state.timerSettings.maxMinutes : 60;
-                    if (maxLabel) maxLabel.innerText = `${maxMin}:00`;
-
-                    const entryDate = new Date(state.activeEntryState.entryTime);
-                    const exitDate = new Date(entryDate.getTime() + (maxMin * 60000));
-                    if (exitElem) {
-                        exitElem.innerText = exitDate.toLocaleTimeString().slice(0, 5);
-                    }
-                }
-
+                const maxSec = (state.timerSettings && state.timerSettings.maxMinutes ? state.timerSettings.maxMinutes : 60) * 60;
                 let elapsed = Math.floor((new Date() - new Date(state.activeEntryState.entryTime)) / 1000);
+
                 if (elapsed < 0) elapsed = 0;
 
                 state.activeEntryState.elapsedSeconds = elapsed;
@@ -907,56 +933,44 @@
             const warnMin = state.timerSettings.warningMinutes || 45;
             const dangerMin = state.timerSettings.dangerMinutes || 55;
 
+            const elapsedMin = elapsedSec / 60;
+            const percent = Math.min(100, Math.max(0, (elapsedMin / maxMin) * 100));
+
             const bar = document.getElementById('indicatorBar');
             const text = document.getElementById('indicatorText');
+
             if (!bar || !text) return;
 
+            bar.style.width = `${percent}%`;
+
             if (!state.activeEntryState.isInside) {
-                bar.style.width = `0%`;
                 bar.className = "bg-slate-300 h-full rounded-full transition-all duration-500";
                 text.innerText = "未計測";
                 text.className = "text-slate-500";
                 return;
             }
 
-            const activeVehicle = state.vehicles[state.activeDriverVehicleId] || state.vehicles[document.getElementById('driverVehicleSelect').value];
-            const isInfinite = activeVehicle && activeVehicle.infiniteTime;
-            const elapsedMin = elapsedSec / 60;
+            const remainMin = Math.max(0, Math.ceil(maxMin - elapsedMin));
 
-            if (isInfinite) {
-                bar.style.width = `0%`;
-                bar.className = "bg-slate-300 h-full rounded-full transition-all duration-500";
-                text.innerText = `時間無制限`;
-                text.className = "text-brand-600 dark:text-brand-400 font-bold";
-                return;
-            }
-
-            const percent = Math.min(100, Math.max(0, (elapsedMin / maxMin) * 100));
-            bar.style.width = `${percent}%`;
-
-            if (elapsedMin > maxMin) {
-                const overMin = Math.floor(elapsedMin - maxMin);
-                bar.className = "bg-rose-500 h-full rounded-full transition-all duration-500 animate-pulse";
-                text.innerText = `超過 ${overMin}分`;
-                text.className = "text-rose-600 dark:text-rose-400 font-bold";
-            } else if (elapsedMin >= dangerMin) {
-                const remainMin = Math.max(0, Math.ceil(maxMin - elapsedMin));
+            if (elapsedMin >= dangerMin) {
+                // 危険レベル (赤色・点滅)
                 bar.className = "bg-rose-500 h-full rounded-full transition-all duration-500 animate-pulse";
                 text.innerText = `出構警告 (残り${remainMin}分)`;
                 text.className = "text-rose-600 dark:text-rose-400 font-bold";
             } else if (elapsedMin >= warnMin) {
-                const remainMin = Math.max(0, Math.ceil(maxMin - elapsedMin));
+                // 警告レベル (黄色)
                 bar.className = "bg-amber-500 h-full rounded-full transition-all duration-500";
                 text.innerText = `出構準備 (残り${remainMin}分)`;
                 text.className = "text-amber-600 dark:text-amber-400 font-bold";
             } else {
-                const remainMin = Math.max(0, Math.ceil(maxMin - elapsedMin));
+                // 通常レベル (緑色)
                 bar.className = "bg-emerald-500 h-full rounded-full transition-all duration-500";
                 text.innerText = `余裕あり (残り${remainMin}分)`;
                 text.className = "text-emerald-600 dark:text-emerald-400";
             }
         }
 
+        // GPS TRANSMITTER LOGIC
         function onConsentCheck() {
             const check = document.getElementById('gpsConsentCheck').checked;
             const btn = document.getElementById('toggleGpsBtn');
@@ -1029,6 +1043,7 @@
             state.lastPos = { lat: latitude, lng: longitude, time: now };
             const vId = state.activeDriverVehicleId;
 
+            // ゲート通過チェック実行
             evaluateGatePassage(latitude, longitude, vId);
 
             if (state.vehicles[vId]) {
@@ -1050,15 +1065,7 @@
                 };
 
                 state.historyLogs.push(logItem);
-
-                const nowTime = now.getTime();
-                const requiredInterval = (calcSpeed >= 5) ? 30000 : 180000;
-                if (!state.lastGasSendTime) state.lastGasSendTime = 0;
-
-                if (nowTime - state.lastGasSendTime >= requiredInterval) {
-                    sendPositionToGAS(logItem, vId);
-                    state.lastGasSendTime = nowTime;
-                }
+                sendPositionToGAS(logItem, vId);
             }
 
             document.getElementById('liveSpeed').innerText = calcSpeed.toFixed(1);
@@ -1072,6 +1079,7 @@
 
         function handleGpsError(err) { showToast(`GPSエラー: ${err.message}`, "warning"); }
 
+        // ADMIN MANAGEMENT
         async function attemptAdminLogin() {
             const pwdInput = document.getElementById('adminPasswordInput').value;
             let adminPassword = "Admin";
@@ -1120,8 +1128,6 @@
                 document.getElementById('modalVehicleName').value = v.name;
                 document.getElementById('modalDriverName').value = v.driverName || '';
                 document.getElementById('modalVehicleColor').value = v.color || "#6366f1";
-                document.getElementById('modalVehicleIcon').value = v.iconType || 'airport_shuttle'; // ★ここで v を安全に参照
-                document.getElementById('modalInfiniteTime').checked = v.infiniteTime || false;
             } else {
                 document.getElementById('vehicleModalTitle').innerText = "新規車両追加";
                 document.getElementById('modalVehicleId').value = `CAR-00${Object.keys(state.vehicles).length + 1}`;
@@ -1129,8 +1135,6 @@
                 document.getElementById('modalVehicleName').value = "";
                 document.getElementById('modalDriverName').value = "";
                 document.getElementById('modalVehicleColor').value = "#6366f1";
-                document.getElementById('modalVehicleIcon').value = 'airport_shuttle'; // ★新規時はデフォルト
-                document.getElementById('modalInfiniteTime').checked = false;
                 validateVehicleIdDuplicate();
             }
             document.getElementById('vehicleModal').classList.remove('hidden');
@@ -1160,8 +1164,6 @@
             const name = document.getElementById('modalVehicleName').value.trim();
             const driverName = document.getElementById('modalDriverName').value.trim();
             const color = document.getElementById('modalVehicleColor').value;
-            const infiniteTime = document.getElementById('modalInfiniteTime').checked; // ★ .checkedに変更
-            const iconType = document.getElementById('modalVehicleIcon').value;
 
             if (!vId || !name) { showToast('車両IDと名前を入力してください', 'warning'); return; }
 
@@ -1171,8 +1173,8 @@
             }
 
             let v = editingVehicleId && state.vehicles[editingVehicleId]
-                ? { ...state.vehicles[editingVehicleId], name, driverName, color, infiniteTime, iconType }
-                : { id: vId, name, driverName, color, infiniteTime, iconType, lat: 35.15250, lng: 136.96861, speed: 0, heading: 0, online: false, isInside: false, entryGateName: "", entryTime: null, lastUpdated: new Date().toISOString() };
+                ? { ...state.vehicles[editingVehicleId], name, driverName, color }
+                : { id: vId, name, driverName, color, lat: 35.15250, lng: 136.96861, speed: 0, heading: 0, online: false, isInside: false, entryGateName: "", entryTime: null, lastUpdated: new Date().toISOString() };
 
             if (editingVehicleId) v.id = editingVehicleId;
 
@@ -1250,6 +1252,7 @@
 
         function exportAllCSV() { exportCSV(null); }
 
+        // GAS REQUEST API
         async function gasRequest(action, payload = {}, method = 'GET') {
             if (!state.gasUrl) throw new Error('GAS URLが設定されていません');
 
@@ -1284,7 +1287,9 @@
         }
 
         let lastGoodVehicleSnapshot = null;
+        let consecutiveEmptyVehicleReads = 0;
 
+        // 修正対象: fetchVehiclesFromGAS 関数内
         async function fetchVehiclesFromGAS(userInitiated = false) {
             if (!state.gasUrl) { updateSyncBadgeStatus('demo'); refreshLocalUI(); return; }
 
@@ -1296,6 +1301,8 @@
                 state.vehicles = incoming;
                 lastGoodVehicleSnapshot = { ...incoming };
                 refreshLocalUI();
+
+                // --- 【追加】データ更新時に、現在選択されている車両の入出構状態を強制同期する ---
                 onDriverVehicleChange();
 
                 if (userInitiated) showToast("最新データを取得しました", "success");
@@ -1357,14 +1364,34 @@
             setInterval(() => {
                 if (state.gasUrl && !state.isLoadingVehicles) fetchVehiclesFromGAS(false);
                 evaluateSyncHealth();
-            }, 180000);
+            }, state.isTracking ? 30000 : (state.currentView === 'map' ? 60000 : 30000));
         }
 
         async function triggerManualReload() {
-            if (state.isLoadingVehicles) return;
+            if (state.reloadCooldown > 0 || state.isLoadingVehicles) return;
             try {
                 await fetchVehiclesFromGAS(true);
+                startCooldown(state.isTracking ? 30 : 60);
             } catch (e) { }
+        }
+
+        function startCooldown(seconds) {
+            state.reloadCooldown = seconds;
+            const btn = document.getElementById('global-reload-btn');
+            const countdownElem = document.getElementById('reloadCountdown');
+            if (btn) btn.disabled = true;
+
+            if (state.cooldownTimer) clearInterval(state.cooldownTimer);
+
+            state.cooldownTimer = setInterval(() => {
+                state.reloadCooldown--;
+                if (countdownElem) countdownElem.innerText = state.reloadCooldown > 0 ? state.reloadCooldown : '';
+                if (state.reloadCooldown <= 0) {
+                    clearInterval(state.cooldownTimer);
+                    if (btn) btn.disabled = false;
+                    if (countdownElem) countdownElem.innerText = '';
+                }
+            }, 1000);
         }
 
         function evaluateSyncHealth() {
@@ -1409,16 +1436,13 @@
             if (vehiclesArr.length === 0) {
                 listContainer.innerHTML = `<div class="text-center py-6 text-xs text-slate-400">登録された車両がありません</div>`;
             } else {
+                // 修正対象: renderVehicleLists関数内の vehicleCards 生成ループ部分
                 vehiclesArr.forEach(v => {
                     const colorHex = v.color || '#6366f1';
                     const speedNum = Number(v.speed) || 0;
-                    const iconName = v.iconType || 'airport_shuttle'; // ★ここで iconName を定義する
 
-                    // 車両名横に表示する無料入構バッジ
-                    const infiniteBadge = v.infiniteTime
-                        ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 font-bold">無料入構</span>`
-                        : '';
-
+                    // 入構中の場合の残り時間・進捗計算
+                    // 入構中の場合の残り時間・進捗計算（config.jsonのタイマー設定と完全連動）
                     let timeInfoHtml = '';
                     if (v.isInside && v.entryTime) {
                         const maxMin = (state.timerSettings && state.timerSettings.maxMinutes) ? state.timerSettings.maxMinutes : 60;
@@ -1427,65 +1451,55 @@
 
                         const elapsedSec = Math.floor((new Date() - new Date(v.entryTime)) / 1000);
                         const elapsedMin = elapsedSec / 60;
+                        const percent = Math.min(100, Math.max(0, (elapsedMin / maxMin) * 100));
                         const entryTimeStr = new Date(v.entryTime).toLocaleTimeString().slice(0, 5);
+                        const remainMin = Math.max(0, Math.ceil(maxMin - elapsedMin));
 
                         let barColor = 'bg-emerald-500';
                         let statusTextColor = 'text-slate-500 dark:text-slate-400';
-                        let statusText = `残り ${Math.max(0, Math.ceil(maxMin - elapsedMin))}分`;
-                        let barWidth = Math.min(100, Math.max(0, (elapsedMin / maxMin) * 100));
 
-                        if (v.infiniteTime) {
-                            barColor = 'bg-slate-300 dark:bg-slate-700';
-                            barWidth = 0;
-                            statusText = '無料入構（無制限）';
-                            statusTextColor = 'text-indigo-600 dark:text-indigo-400 font-bold';
-                        } else if (elapsedMin > maxMin) {
-                            barColor = 'bg-rose-500 animate-pulse';
-                            statusTextColor = 'text-rose-600 dark:text-rose-400 font-bold';
-                            statusText = `超過 ${Math.floor(elapsedMin - maxMin)}分`;
-                        } else if (elapsedMin >= dangerMin) {
+                        if (elapsedMin >= dangerMin) {
+                            // 危険レベル (赤色・点滅)
                             barColor = 'bg-rose-500 animate-pulse';
                             statusTextColor = 'text-rose-600 dark:text-rose-400 font-bold';
                         } else if (elapsedMin >= warnMin) {
+                            // 警告レベル (黄色)
                             barColor = 'bg-amber-500';
                             statusTextColor = 'text-amber-600 dark:text-amber-400 font-bold';
                         }
 
                         timeInfoHtml = `
-                            <div class="mt-1 pt-1 border-t border-slate-200 dark:border-slate-700 space-y-1">
-                                <div class="flex justify-between text-[10px] ${statusTextColor}">
-                                    <span>入構: ${entryTimeStr}</span>
-                                    <span>${statusText}</span>
-                                </div>
-                                <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                                    <div class="${barColor} h-full rounded-full transition-all duration-500" style="width: ${barWidth}%;"></div>
-                                </div>
-                            </div>
-                        `;
+        <div class="mt-1 pt-1 border-t border-slate-200 dark:border-slate-700 space-y-1">
+            <div class="flex justify-between text-[10px] ${statusTextColor}">
+                <span>入構: ${entryTimeStr} (${v.entryGateName || '構内'})</span>
+                <span>残り ${remainMin}分</span>
+            </div>
+            <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                <div class="${barColor} h-full rounded-full transition-all duration-500" style="width: ${percent}%;"></div>
+            </div>
+        </div>
+    `;
                     }
 
                     const item = document.createElement('div');
                     item.className = "p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 hover:border-brand-500 cursor-pointer transition-all";
                     item.onclick = () => focusOnVehicle(v.id);
                     item.innerHTML = `
-                        <div class="flex items-center justify-between mb-1">
-                            <span class="font-bold text-xs flex items-center gap-1.5 text-slate-800 dark:text-slate-100">
-                                <span class="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-white text-xs" style="background-color: ${colorHex}">
-                                    <span class="material-symbols-outlined text-sm">${iconName}</span>
-                                </span>
-                                ${v.name}
-                                ${infiniteBadge}
-                            </span>
-                            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${v.isInside ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}">
-                                ${v.isInside ? '構内' : '構外'}
-                            </span>
-                        </div>
-                        <div class="text-[11px] text-slate-500 dark:text-slate-400 flex justify-between font-mono">
-                            <span>速度: ${speedNum.toFixed(1)} km/h</span>
-                            <span>${formatTimeAgo(v.lastUpdated)}</span>
-                        </div>
-                        ${timeInfoHtml}
-                    `;
+            <div class="flex items-center justify-between mb-1">
+                <span class="font-bold text-xs flex items-center gap-1.5 text-slate-800 dark:text-slate-100">
+                    <span class="w-3 h-3 rounded-full shrink-0" style="background-color: ${colorHex}"></span>
+                    ${v.name}
+                </span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${v.isInside ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}">
+                    ${v.isInside ? '構内' : '構外'}
+                </span>
+            </div>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400 flex justify-between font-mono">
+                <span>速度: ${speedNum.toFixed(1)} km/h</span>
+                <span>${formatTimeAgo(v.lastUpdated)}</span>
+            </div>
+            ${timeInfoHtml}
+        `;
                     listContainer.appendChild(item);
                 });
             }
@@ -1515,44 +1529,37 @@
 
             vehiclesArr.forEach(v => {
                 const colorHex = v.color || '#6366f1';
-                const elapsedStr = (v.isInside && v.entryTime)
-                    ? ` (${Math.floor((new Date() - new Date(v.entryTime)) / 60000)}分経過)`
-                    : '';
-
-                // ★ 無料入構バッジの定義
-                const infiniteBadge = v.infiniteTime
-                    ? `<span class="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">無料入構</span>`
-                    : '';
-
                 const row = document.createElement('tr');
                 row.className = "hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors";
                 row.innerHTML = `
-                    <td class="p-3"><span class="w-4 h-4 rounded-full inline-block align-middle border border-slate-300 dark:border-slate-700" style="background-color: ${colorHex}"></span></td>
-                    <td class="p-3 font-mono font-bold text-brand-600 dark:text-brand-400">${v.id}</td>
-                    <td class="p-3 font-bold">
-                        <div>${v.name} ${infiniteBadge}</div>
-                        <div class="text-[11px] font-normal text-slate-500">${v.driverName ? '乗務者: ' + v.driverName : 'ドライバー未設定'}</div>
-                    </td>
-                    <td class="p-3">
-                        <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${v.isInside ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}">
-                            ${v.isInside ? '構内' : '構外'}${elapsedStr}
-                        </span>
-                    </td>
-                    <td class="p-3">
-                        <button onclick="toggleVehicleOnlineStatus('${v.id}')" class="px-2 py-1 rounded-full text-[10px] font-bold transition-all hover:scale-105 ${v.online ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300'}">
-                            ${v.online ? 'オンライン' : 'オフライン'}
-                        </button>
-                    </td>
-                    <td class="p-3 text-slate-500 dark:text-slate-400 font-mono text-[11px]">${formatTimeAgo(v.lastUpdated)}</td>
-                    <td class="p-3 text-right space-x-1">
-                        <button onclick="exportCSV('${v.id}')" title="CSV出力" class="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950 rounded-lg transition-colors"><span class="material-symbols-outlined text-base">download</span></button>
-                        <button onclick="openVehicleModal('${v.id}')" title="編集" class="p-1.5 text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950 rounded-lg transition-colors"><span class="material-symbols-outlined text-base">edit</span></button>
-                        <button onclick="deleteVehicle('${v.id}')" title="削除" class="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 rounded-lg transition-colors"><span class="material-symbols-outlined text-base">delete</span></button>
-                    </td>
-                `;
+                        <td class="p-3"><span class="w-4 h-4 rounded-full inline-block align-middle border border-slate-300 dark:border-slate-700" style="background-color: ${colorHex}"></span></td>
+                        <td class="p-3 font-mono font-bold text-brand-600 dark:text-brand-400">${v.id}</td>
+                        <td class="p-3 font-bold">
+                            <div>${v.name}</div>
+                            <div class="text-[11px] font-normal text-slate-500">${v.driverName ? '乗務者: ' + v.driverName : 'ドライバー未設定'}</div>
+                        </td>
+                        <td class="p-3">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${v.isInside ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}">
+                                ${v.isInside ? '構内' : '構外'}
+                            </span>
+                        </td>
+                        <td class="p-3">
+                            <button onclick="toggleVehicleOnlineStatus('${v.id}')" class="px-2 py-1 rounded-full text-[10px] font-bold transition-all hover:scale-105 ${v.online ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300'}">
+                                ${v.online ? 'オンライン' : 'オフライン'}
+                            </button>
+                        </td>
+                        <td class="p-3 text-slate-500 dark:text-slate-400 font-mono text-[11px]">${formatTimeAgo(v.lastUpdated)}</td>
+                        <td class="p-3 text-right space-x-1">
+                            <button onclick="exportCSV('${v.id}')" title="CSV出力" class="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950 rounded-lg transition-colors"><span class="material-symbols-outlined text-base">download</span></button>
+                            <button onclick="openVehicleModal('${v.id}')" title="編集" class="p-1.5 text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-950 rounded-lg transition-colors"><span class="material-symbols-outlined text-base">edit</span></button>
+                            <button onclick="deleteVehicle('${v.id}')" title="削除" class="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 rounded-lg transition-colors"><span class="material-symbols-outlined text-base">delete</span></button>
+                        </td>
+                    `;
                 adminBody.appendChild(row);
             });
         }
+
+        // 修正対象: populateVehicleSelects 関数を以下のように差し替え
         function populateVehicleSelects() {
             const select = document.getElementById('driverVehicleSelect');
             if (!select) return;
@@ -1574,6 +1581,7 @@
                     select.appendChild(opt);
                 });
 
+                // 以前選択されていたものがあれば維持、なければ先頭の車両をデフォルト選択
                 if (previousValue && state.vehicles[previousValue]) {
                     select.value = previousValue;
                 } else if (vehiclesArr.length > 0) {
@@ -1581,9 +1589,11 @@
                 }
             }
 
+            // 選択された車両の状態を即座にUIへ反映
             onDriverVehicleChange();
         }
 
+        // 修正対象: switchView 関数内
         function switchView(viewName) {
             state.currentView = viewName;
             ['map', 'driver', 'admin'].forEach(v => {
@@ -1591,13 +1601,13 @@
             });
             document.getElementById(`view-${viewName}`).classList.remove('hidden');
 
-            // ★ 地図タブを表示した際に必ずサイズを再計算する
             if (viewName === 'map' && map) {
-                setTimeout(() => map.invalidateSize(), 100);
+                setTimeout(() => map.invalidateSize(), 200);
             } else if (viewName === 'driver' || (viewName === 'admin' && state.adminAuthenticated)) {
                 fetchVehiclesFromGAS(true);
             }
 
+            // --- 【ここを修正】デスクトップ用タブのアクティブ・非アクティブ切り替え ---
             ['map', 'driver', 'admin'].forEach(v => {
                 const tabBtn = document.getElementById(`tab-${v}`);
                 if (!tabBtn) return;
@@ -1608,6 +1618,7 @@
                 }
             });
 
+            // モバイル用タブの切り替え
             ['map', 'driver', 'admin'].forEach(v => {
                 const mobBtn = document.getElementById(`mob-tab-${v}`);
                 if (!mobBtn) return;
@@ -1647,10 +1658,12 @@
             const icon = document.getElementById('drawerToggleIcon');
             if (window.innerWidth < 768) {
                 if (drawer.classList.contains('h-14')) {
+                    // 拡大表示：画面高さの60%に設定してスクロール可能に
                     drawer.classList.remove('h-14');
                     drawer.classList.add('h-[60vh]');
                     if (icon) icon.innerText = 'expand_more';
                 } else {
+                    // 縮小表示：ヘッダーのみ表示
                     drawer.classList.remove('h-[60vh]', 'h-[75vh]', 'h-48', 'h-40');
                     drawer.classList.add('h-14');
                     if (icon) icon.innerText = 'expand_less';
@@ -1734,67 +1747,41 @@
             return dirs[Math.round(angle / 45) % 8];
         }
 
+        // 修正・改善版: onDriverVehicleChange 関数
         function onDriverVehicleChange() {
             const select = document.getElementById('driverVehicleSelect');
             if (!select) return;
             const vId = select.value;
-
-            // 選択中の車両IDを現在の車両に確実に同期する
-            if (!state.isTracking) {
-                state.activeDriverVehicleId = vId;
-            }
-
             const v = state.vehicles[vId];
+
             if (!v) {
                 resetDriverGateUI();
                 return;
             }
 
-            // 文字列の "false" / "FALSE" や空文字を除外して厳密に真偽値を判定
-            const isActuallyInside = (v.isInside === true || String(v.isInside).toLowerCase() === 'true');
-            const hasValidEntryTime = v.entryTime && String(v.entryTime).trim() !== "" && !isNaN(new Date(v.entryTime).getTime());
-
-            if (isActuallyInside && hasValidEntryTime) {
+            // 車両の入構状態をチェック
+            if (v.isInside && v.entryTime) {
                 const entryDate = new Date(v.entryTime);
+
+                // サーバーから取得したデータでアクティブ状態を上書き・同期
                 state.activeEntryState.isInside = true;
                 state.activeEntryState.entryGateName = v.entryGateName || '入構中';
                 state.activeEntryState.entryTime = entryDate;
 
                 const badge = document.getElementById('gateStatusBadge');
                 const entryLabel = document.getElementById('entryTimeLabel');
-                const exitLabel = document.getElementById('exitTimeLabel');
-                const maxLabel = document.getElementById('maxTimeLabel');
                 const lastGateLabel = document.getElementById('lastGateLabel');
 
                 if (badge) {
-                    badge.innerText = "入構中";
+                    badge.innerText = `入構中 (${v.entryGateName || '入構中'})`;
                     badge.className = "text-[11px] px-2.5 py-1 rounded-full font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300";
                 }
                 if (entryLabel) entryLabel.innerText = entryDate.toLocaleTimeString().slice(0, 5);
-
-                const maxMin = (state.timerSettings && state.timerSettings.maxMinutes) ? state.timerSettings.maxMinutes : 60;
-                if (v.infiniteTime) {
-                    if (exitLabel) exitLabel.innerText = "--:--";
-                    if (maxLabel) maxLabel.innerText = "--:--";
-                } else {
-                    if (maxLabel) maxLabel.innerText = `${maxMin}:00`;
-                    const exitDate = new Date(entryDate.getTime() + (maxMin * 60000));
-                    if (exitLabel) exitLabel.innerText = exitDate.toLocaleTimeString().slice(0, 5);
-                }
-
                 if (lastGateLabel) lastGateLabel.innerText = v.entryGateName || '入構中';
 
-                // 切り替え直後に即座に経過秒数とインジケーターを更新
-                const elapsed = Math.max(0, Math.floor((new Date() - entryDate) / 1000));
-                state.activeEntryState.elapsedSeconds = elapsed;
-                updateStopwatchDisplay(elapsed);
-                updateIndicatorUI(elapsed);
             } else {
-                // 未入構の車両に切り替わった場合は必ず00:00:00にリセット
+                // 出構済み、または未入構の場合は確実にリセットする
                 resetDriverGateUI();
-                const maxLabel = document.getElementById('maxTimeLabel');
-                const maxMin = (state.timerSettings && state.timerSettings.maxMinutes) ? state.timerSettings.maxMinutes : 60;
-                if (maxLabel) maxLabel.innerText = v.infiniteTime ? "--:--" : `${maxMin}:00`;
             }
         }
 
@@ -1806,21 +1793,20 @@
 
             const badge = document.getElementById('gateStatusBadge');
             const entryLabel = document.getElementById('entryTimeLabel');
-            const exitLabel = document.getElementById('exitTimeLabel');
             const lastGateLabel = document.getElementById('lastGateLabel');
 
             if (badge) {
-                badge.innerText = "未入構";
+                badge.innerText = "構外 (未入構)";
                 badge.className = "text-[11px] px-2.5 py-1 rounded-full font-bold bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400";
             }
             if (entryLabel) entryLabel.innerText = "--:--";
-            if (exitLabel) exitLabel.innerText = "--:--";
             if (lastGateLabel) lastGateLabel.innerText = "なし";
 
             updateStopwatchDisplay(0);
             updateIndicatorUI(0);
         }
 
+        // 修正後の manualGateAction 関数（フォールバック削除版）
         async function manualGateAction(eventType) {
             const vId = document.getElementById('driverVehicleSelect').value;
             if (!vId || !state.vehicles[vId]) {
@@ -1832,6 +1818,7 @@
             const currentLat = v.lat || 35.15250;
             const currentLng = v.lng || 136.96861;
 
+            // config.json から直接取得（フォールバックなし）
             const targetGates = (eventType === 'ENTRY')
                 ? state.gateSettings.entryGates
                 : state.gateSettings.exitGates;
@@ -1867,6 +1854,7 @@
                 await fetchVehiclesFromGAS(false);
             }
         }
+
     </script>
 </body>
 
